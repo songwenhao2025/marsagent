@@ -1,0 +1,69 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: marsreg-document
+  datasource:
+    url: jdbc:mysql://localhost:3306/marsreg?useUnicode=true&characterEncoding=utf-8&useSSL=false
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  cache:
+    type: simple
+    cache-names: documentChunks,documentContent
+    simple:
+      # 缓存过期时间（毫秒）
+      time-to-live: 3600000
+      # 缓存最大大小
+      max-size: 1000
+
+minio:
+  endpoint: http://localhost:9000
+  accessKey: minioadmin
+  secretKey: minioadmin
+  bucket: marsreg
+
+logging:
+  level:
+    com.marsreg: debug
+
+marsreg:
+  document:
+    chunking:
+      # 默认最大块大小（字符数）
+      default-max-chunk-size: 1000
+      # 默认最小块大小（字符数）
+      default-min-chunk-size: 200
+      # 默认重叠大小（字符数）
+      default-overlap-size: 100
+      # 是否启用智能分块
+      enable-smart-chunking: true
+      # 是否在句子边界分割
+      split-on-sentence-boundary: true
+      # 是否在段落边界分割
+      split-on-paragraph-boundary: true
+      # 是否保持段落完整性
+      preserve-paragraph-integrity: true
+    index:
+      # 是否启用索引
+      enabled: true
+      # 索引刷新间隔（毫秒）
+      refresh-interval: 300000
+      # 索引批处理大小
+      batch-size: 100
+      # 是否异步索引
+      async: true
+      # 索引线程池大小
+      thread-pool-size: 4 
