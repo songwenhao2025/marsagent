@@ -425,4 +425,57 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     public void clearDocumentCache(Long documentId) {
         log.debug("清除文档缓存: {}", documentId);
     }
+
+    /**
+     * 计算文本中的单词数
+     */
+    private int countWords(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return text.split("\\s+").length;
+    }
+
+    /**
+     * 计算文本中的句子数
+     */
+    private int countSentences(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return text.split("[.!?。！？]").length;
+    }
+
+    /**
+     * 计算文本中的段落数
+     */
+    private int countParagraphs(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return text.split("\n\\s*\n").length;
+    }
+
+    @Override
+    public String extractText(InputStream inputStream, String fileName) {
+        try {
+            Metadata metadata = new Metadata();
+            metadata.set(Metadata.RESOURCE_NAME_KEY, fileName);
+            
+            BodyContentHandler handler = new BodyContentHandler(-1);
+            Parser parser = new AutoDetectParser();
+            ParseContext context = new ParseContext();
+            
+            parser.parse(inputStream, handler, metadata, context);
+            
+            return handler.toString();
+        } catch (IOException | SAXException | TikaException e) {
+            throw new BusinessException("文本提取失败", e);
+        }
+    }
+
+    @Override
+    public Document processDocument(Document document) {
+        return process(document);
+    }
 } 
