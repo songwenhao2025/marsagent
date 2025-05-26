@@ -3,12 +3,14 @@ package com.marsreg.document.service.impl;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentContent;
+import com.marsreg.document.entity.DocumentStatus;
 import com.marsreg.document.repository.DocumentContentRepository;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.DocumentProcessService;
 import com.marsreg.document.service.DocumentService;
 import com.marsreg.document.service.DocumentStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
@@ -39,7 +42,7 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public Document getDocument(Long id) {
+    public Document getById(Long id) {
         return documentRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("文档不存在"));
     }
@@ -47,7 +50,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional
     public void delete(Long id) {
-        Document document = getDocument(id);
+        Document document = getById(id);
         // 删除文档内容
         documentContentRepository.findByDocumentId(id).ifPresent(documentContentRepository::delete);
         // 从存储服务删除
@@ -63,8 +66,15 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public String getDocumentUrl(Long id, int expirySeconds) {
-        Document document = getDocument(id);
+        Document document = getById(id);
         return documentStorageService.getDocumentUrl(document, expirySeconds);
+    }
+
+    @Override
+    public String getContent(Long id) {
+        return documentContentRepository.findByDocumentId(id)
+                .map(DocumentContent::getContent)
+                .orElseThrow(() -> new BusinessException("文档内容不存在"));
     }
 
     private void processDocument(Document document) {
@@ -84,12 +94,7 @@ public class DocumentServiceImpl implements DocumentService {
             // 创建文档内容
             DocumentContent content = new DocumentContent();
             content.setDocumentId(document.getId());
-            content.setOriginalText(text);
-            content.setCleanedText(cleanedText);
-            content.setLanguage(language);
-            content.setWordCount(countWords(cleanedText));
-            content.setParagraphCount(countParagraphs(cleanedText));
-            content.setChunks(chunks);
+            content.setContent(text);
             
             // 保存文档内容
             documentContentRepository.save(content);

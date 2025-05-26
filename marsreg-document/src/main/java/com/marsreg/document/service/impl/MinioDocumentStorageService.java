@@ -6,6 +6,7 @@ import com.marsreg.document.entity.DocumentStatus;
 import com.marsreg.document.service.DocumentStorageService;
 import io.minio.*;
 import io.minio.messages.DeleteObject;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;

@@ -8,9 +8,23 @@ public interface DocumentProcessService {
     /**
      * 处理文档
      * @param document 文档对象
+     * @return 处理后的文档
+     */
+    Document process(Document document);
+
+    /**
+     * 处理文档
+     * @param document 文档对象
      * @return 处理后的文本内容
      */
     String processDocument(Document document);
+
+    /**
+     * 提取文本
+     * @param document 文档对象
+     * @return 提取的文本内容
+     */
+    String extractText(Document document);
 
     /**
      * 提取文本

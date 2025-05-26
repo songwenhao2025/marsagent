@@ -15,8 +15,8 @@ import org.apache.lucene.store.FSDirectory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
@@ -135,8 +135,8 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                 int end = Math.min(start + size, hits.length);
                 
                 for (int i = start; i < end; i++) {
-                    Document doc = searcher.doc(hits[i].doc);
-                    results.add(Long.parseLong(doc.get("id")));
+                    org.apache.lucene.document.Document luceneDoc = searcher.doc(hits[i].doc);
+                    results.add(Long.parseLong(luceneDoc.get("id")));
                 }
                 
                 return results;

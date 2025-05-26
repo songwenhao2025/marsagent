@@ -16,8 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
-import org.apache.tika.language.LanguageIdentifier;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
@@ -91,7 +91,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         try (InputStream inputStream = documentStorageService.getDocument(document)) {
             // 使用Tika提取文本
             Metadata metadata = new Metadata();
-            metadata.set(Metadata.RESOURCE_NAME_KEY, document.getOriginalName());
+            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, document.getOriginalName());
             
             BodyContentHandler handler = new BodyContentHandler(-1);
             Parser parser = new AutoDetectParser();
@@ -152,11 +152,10 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
 
         try {
             // 使用Tika的语言检测
-            LanguageIdentifier identifier = new LanguageIdentifier(text);
-            String language = identifier.getLanguage();
+            String language = tika.detect(text);
 
             // 如果置信度太低，使用启发式规则
-            if (identifier.getConfidence() < 0.5) {
+            if (language == null || language.equals("unknown")) {
                 language = detectLanguageByRules(text);
             }
 
@@ -460,7 +459,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     public String extractText(InputStream inputStream, String fileName) {
         try {
             Metadata metadata = new Metadata();
-            metadata.set(Metadata.RESOURCE_NAME_KEY, fileName);
+            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName);
             
             BodyContentHandler handler = new BodyContentHandler(-1);
             Parser parser = new AutoDetectParser();
@@ -475,7 +474,8 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     }
 
     @Override
-    public Document processDocument(Document document) {
-        return process(document);
+    public String processDocument(Document document) {
+        Document processedDoc = process(document);
+        return extractText(processedDoc);
     }
 } 
