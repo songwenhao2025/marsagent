@@ -4,6 +4,7 @@ import com.marsreg.document.entity.Document;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Map;
 
 public interface DocumentSearchService {
@@ -54,4 +55,28 @@ public interface DocumentSearchService {
      * @return 文档分页结果，包含高亮片段
      */
     Page<Map<String, Object>> searchTitleWithHighlight(String query, Pageable pageable);
+
+    /**
+     * 获取搜索建议
+     * @param prefix 搜索前缀
+     * @param limit 建议数量限制
+     * @return 建议列表
+     */
+    List<String> getSuggestions(String prefix, int limit);
+
+    /**
+     * 获取标题搜索建议
+     * @param prefix 搜索前缀
+     * @param limit 建议数量限制
+     * @return 建议列表
+     */
+    List<String> getTitleSuggestions(String prefix, int limit);
+
+    /**
+     * 获取内容搜索建议
+     * @param prefix 搜索前缀
+     * @param limit 建议数量限制
+     * @return 建议列表
+     */
+    List<String> getContentSuggestions(String prefix, int limit);
 } 

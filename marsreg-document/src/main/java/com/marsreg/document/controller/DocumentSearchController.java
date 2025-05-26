@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "文档搜索", description = "文档搜索接口")
@@ -66,5 +67,29 @@ public class DocumentSearchController {
             @RequestParam String query,
             Pageable pageable) {
         return Result.success(documentSearchService.searchTitleWithHighlight(query, pageable));
+    }
+
+    @Operation(summary = "获取搜索建议")
+    @GetMapping("/suggestions")
+    public Result<List<String>> getSuggestions(
+            @RequestParam String prefix,
+            @RequestParam(defaultValue = "10") int limit) {
+        return Result.success(documentSearchService.getSuggestions(prefix, limit));
+    }
+
+    @Operation(summary = "获取标题搜索建议")
+    @GetMapping("/title/suggestions")
+    public Result<List<String>> getTitleSuggestions(
+            @RequestParam String prefix,
+            @RequestParam(defaultValue = "10") int limit) {
+        return Result.success(documentSearchService.getTitleSuggestions(prefix, limit));
+    }
+
+    @Operation(summary = "获取内容搜索建议")
+    @GetMapping("/content/suggestions")
+    public Result<List<String>> getContentSuggestions(
+            @RequestParam String prefix,
+            @RequestParam(defaultValue = "10") int limit) {
+        return Result.success(documentSearchService.getContentSuggestions(prefix, limit));
     }
 } 
