@@ -38,11 +38,17 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
     private static final int MAX_NUM_FRAGMENTS = 3;
     private static final int BATCH_SIZE = 100;
     private static final Map<String, Set<String>> termCache = new ConcurrentHashMap<>();
+    private String indexPath = "index";
 
     public DocumentSearchServiceImpl(DocumentRepository documentRepository) {
+        this(documentRepository, "index");
+    }
+
+    public DocumentSearchServiceImpl(DocumentRepository documentRepository, String indexPath) {
         this.documentRepository = documentRepository;
+        this.indexPath = indexPath;
         try {
-            this.directory = FSDirectory.open(Paths.get("index"));
+            this.directory = FSDirectory.open(Paths.get(indexPath));
             this.analyzer = new StandardAnalyzer();
             // 预热缓存
             warmupCache();
@@ -103,9 +109,11 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
                 q = queryBuilder.build();
             }
             
-            // 执行搜索
-            TopDocs docs = searcher.search(q, pageable.getPageNumber() * pageable.getPageSize());
-            ScoreDoc[] hits = docs.scoreDocs;
+            // 确保numHits大于0
+            int numHits = Math.max(1, pageable.getPageSize());
+            // 使用numHits替代pageable.getPageSize()
+            TopDocs topDocs = searcher.search(q, numHits);
+            ScoreDoc[] hits = topDocs.scoreDocs;
             
             // 批量获取文档
             List<Document> results = new ArrayList<>();
@@ -132,7 +140,7 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
                 }
             }
             
-            return new PageImpl<>(results, pageable, docs.totalHits.value);
+            return new PageImpl<>(results, pageable, topDocs.totalHits.value);
         } catch (IOException e) {
             log.error("搜索失败", e);
             return Page.empty(pageable);

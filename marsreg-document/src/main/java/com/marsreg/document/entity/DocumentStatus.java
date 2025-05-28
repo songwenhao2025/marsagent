@@ -1,8 +1,23 @@
 package com.marsreg.document.entity;
 
 public enum DocumentStatus {
-    UPLOADING,    // 上传中
-    PROCESSING,   // 处理中
-    COMPLETED,    // 处理完成
-    FAILED        // 处理失败
+    /**
+     * 待处理
+     */
+    PENDING,
+
+    /**
+     * 处理中
+     */
+    PROCESSING,
+
+    /**
+     * 已完成
+     */
+    COMPLETED,
+
+    /**
+     * 处理失败
+     */
+    FAILED
 } 

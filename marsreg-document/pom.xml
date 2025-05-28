@@ -18,6 +18,11 @@
             <artifactId>marsreg-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.marsreg</groupId>
+            <artifactId>marsreg-vector</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Spring Boot -->
         <dependency>

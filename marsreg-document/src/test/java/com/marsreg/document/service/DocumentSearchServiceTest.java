@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("unchecked")
 class DocumentSearchServiceTest {
 
     private DocumentSearchService searchService;
@@ -102,6 +103,7 @@ class DocumentSearchServiceTest {
         // 验证高亮结果
         results.getContent().forEach(result -> {
             assertTrue(result.containsKey("highlights"));
+            @SuppressWarnings("unchecked")
             Map<String, String[]> highlights = (Map<String, String[]>) result.get("highlights");
             assertTrue(highlights.containsKey("title") || highlights.containsKey("content"));
         });

@@ -12,6 +12,7 @@ import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentIndexService;
 import com.marsreg.document.service.DocumentProcessService;
 import com.marsreg.document.service.DocumentStorageService;
+import com.marsreg.document.service.DocumentVectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -36,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,6 +48,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     private final DocumentIndexService documentIndexService;
     private final DocumentChunkRepository documentChunkRepository;
     private final DocumentChunkMetadataService metadataService;
+    private final DocumentVectorService documentVectorService;
     private final ChunkingConfig chunkingConfig;
     private final Tika tika = new Tika();
 
@@ -322,6 +325,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         metadataService.deleteByDocumentId(documentId);
 
         // 保存新的分块
+        List<DocumentChunk> savedChunks = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             String chunk = chunks.get(i);
             DocumentChunk documentChunk = new DocumentChunk();
@@ -331,6 +335,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
             documentChunk.setWordCount(countWords(chunk));
             documentChunk.setLanguage(language);
             documentChunk = documentChunkRepository.save(documentChunk);
+            savedChunks.add(documentChunk);
 
             // 保存分块元数据
             saveChunkMetadata(documentChunk);
@@ -340,6 +345,11 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         documentIndexService.indexDocument(new Document() {{
             setId(documentId);
         }}, chunks);
+
+        // 向量化并存储分块
+        Document document = new Document();
+        document.setId(documentId);
+        documentVectorService.vectorizeAndStore(document, savedChunks);
     }
 
     /**
@@ -404,7 +414,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         List<DocumentChunk> chunks = documentChunkRepository.findByDocumentIdOrderByChunkIndexAsc(documentId);
         return chunks.stream()
                 .map(DocumentChunk::getContent)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**

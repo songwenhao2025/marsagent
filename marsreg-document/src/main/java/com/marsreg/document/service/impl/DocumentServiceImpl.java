@@ -9,6 +9,7 @@ import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.DocumentProcessService;
 import com.marsreg.document.service.DocumentService;
 import com.marsreg.document.service.DocumentStorageService;
+import com.marsreg.document.service.DocumentVectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -28,17 +30,36 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentContentRepository documentContentRepository;
     private final DocumentStorageService documentStorageService;
     private final DocumentProcessService documentProcessService;
+    private final DocumentVectorService documentVectorService;
 
     @Override
     @Transactional
     public Document upload(MultipartFile file) {
-        // 上传到存储服务
-        Document document = documentStorageService.upload(file);
-        // 保存到数据库
-        document = documentRepository.save(document);
-        // 处理文档
-        processDocument(document);
-        return document;
+        try {
+            // 1. 保存文件到存储服务
+            String objectName = UUID.randomUUID().toString();
+            documentStorageService.storeFile(file, objectName);
+
+            // 2. 创建文档记录
+            Document document = new Document();
+            document.setName(file.getOriginalFilename());
+            document.setOriginalName(file.getOriginalFilename());
+            document.setContentType(file.getContentType());
+            document.setSize(file.getSize());
+            document.setStoragePath(objectName);
+            document.setStatus(DocumentStatus.PENDING);
+            document.setBucket(documentStorageService.getBucketName());
+            document.setObjectName(objectName);
+            document = documentRepository.save(document);
+
+            // 3. 异步处理文档
+            documentProcessService.process(document);
+
+            return document;
+        } catch (Exception e) {
+            log.error("文档上传失败", e);
+            throw new BusinessException("文档上传失败: " + e.getMessage());
+        }
     }
 
     @Override
@@ -51,12 +72,22 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional
     public void delete(Long id) {
         Document document = getById(id);
-        // 删除文档内容
-        documentContentRepository.findByDocumentId(id).ifPresent(documentContentRepository::delete);
-        // 从存储服务删除
-        documentStorageService.delete(document);
-        // 从数据库删除
-        documentRepository.delete(document);
+        
+        try {
+            // 1. 删除存储的文件
+            documentStorageService.deleteFile(document.getBucket(), document.getObjectName());
+            
+            // 2. 删除文档的向量
+            documentVectorService.deleteDocumentVectors(id);
+            
+            // 3. 删除数据库记录
+            documentRepository.delete(document);
+            
+            log.info("文档删除成功: id={}", id);
+        } catch (Exception e) {
+            log.error("文档删除失败: id={}", id, e);
+            throw new BusinessException("文档删除失败: " + e.getMessage());
+        }
     }
 
     @Override
@@ -67,7 +98,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public String getDocumentUrl(Long id, int expirySeconds) {
         Document document = getById(id);
-        return documentStorageService.getDocumentUrl(document, expirySeconds);
+        return documentStorageService.getFileUrl(document.getBucket(), document.getObjectName(), expirySeconds);
     }
 
     @Override

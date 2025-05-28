@@ -9,6 +9,7 @@ import com.marsreg.document.repository.DocumentContentRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentProcessService;
 import com.marsreg.document.service.DocumentService;
+import com.marsreg.document.service.DocumentVectorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class DocumentController {
     private final DocumentContentRepository documentContentRepository;
     private final DocumentProcessService documentProcessService;
     private final DocumentChunkMetadataService metadataService;
+    private final DocumentVectorService documentVectorService;
 
     @Operation(summary = "上传文档")
     @PostMapping("/upload")
@@ -110,5 +112,24 @@ public class DocumentController {
             @PathVariable String key) {
         metadataService.deleteByChunkIdAndKey(chunkId, key);
         return Result.success();
+    }
+
+    @Operation(summary = "语义搜索文档分块")
+    @GetMapping("/search")
+    public Result<List<Map<String, Object>>> searchChunks(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "0.7") float minScore) {
+        return Result.success(documentVectorService.searchChunks(query, limit, minScore));
+    }
+
+    @Operation(summary = "按文档ID语义搜索分块")
+    @GetMapping("/{documentId}/search")
+    public Result<List<Map<String, Object>>> searchChunksByDocument(
+            @PathVariable Long documentId,
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "0.7") float minScore) {
+        return Result.success(documentVectorService.searchChunksByDocument(documentId, query, limit, minScore));
     }
 } 

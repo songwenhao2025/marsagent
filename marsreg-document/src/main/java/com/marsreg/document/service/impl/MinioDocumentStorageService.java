@@ -85,7 +85,7 @@ public class MinioDocumentStorageService implements DocumentStorageService {
             document.setSize(size);
             document.setStoragePath(objectName);
             document.setMd5(md5);
-            document.setStatus(DocumentStatus.UPLOADING);
+            document.setStatus(DocumentStatus.PENDING);
             document.setBucket(bucket);
             document.setObjectName(objectName);
 
@@ -125,6 +125,50 @@ public class MinioDocumentStorageService implements DocumentStorageService {
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .bucket(document.getBucket())
                     .object(document.getObjectName())
+                    .expiry(expirySeconds)
+                    .build());
+        } catch (Exception e) {
+            throw new BusinessException("获取文件URL失败", e);
+        }
+    }
+
+    @Override
+    public String getBucketName() {
+        return bucket;
+    }
+
+    @Override
+    public void storeFile(MultipartFile file, String objectName) {
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectName)
+                    .stream(file.getInputStream(), file.getSize(), -1)
+                    .contentType(file.getContentType())
+                    .build());
+        } catch (Exception e) {
+            throw new BusinessException("存储文件失败", e);
+        }
+    }
+
+    @Override
+    public void deleteFile(String bucket, String objectName) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectName)
+                    .build());
+        } catch (Exception e) {
+            throw new BusinessException("删除文件失败", e);
+        }
+    }
+
+    @Override
+    public String getFileUrl(String bucket, String objectName, int expirySeconds) {
+        try {
+            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                    .bucket(bucket)
+                    .object(objectName)
                     .expiry(expirySeconds)
                     .build());
         } catch (Exception e) {

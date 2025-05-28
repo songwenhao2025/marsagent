@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: marsreg-vector
+
+marsreg:
+  vector:
+    # HuggingFace模型配置
+    model:
+      name: sentence-transformers/all-MiniLM-L6-v2
+      dimension: 384
+    # 线程池配置
+    thread-pool-size: 4
+    # Milvus配置
+    milvus:
+      host: localhost
+      port: 19530
+      collection: marsreg_vectors
+      dimension: 384
+      # 认证配置
+      auth:
+        enabled: true  # 启用认证
+        token: "97b59e4528a9eaf7a41d328ee07957659347638769623a3cf1a04c280838f469c702e946b865d6b88138f5727e3e7eb5547e9543"
+      # 索引配置
+      index:
+        type: IVF_SQ8
+        nlist: 1024
+        metric-type: COSINE 
