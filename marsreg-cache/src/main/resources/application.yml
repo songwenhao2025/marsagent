@@ -1,0 +1,105 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: marsreg-cache
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1
+        max-idle: 8
+        min-idle: 0
+
+# 缓存配置
+cache:
+  # 本地缓存配置
+  local:
+    enabled: true
+    type: caffeine
+    maximum-size: 10000
+    expire-after-write: 3600
+    refresh-after-write: 1800
+  # 分布式缓存配置
+  distributed:
+    enabled: true
+    type: redis
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 2000
+      max-total: 8
+      max-idle: 8
+      min-idle: 0
+  # 多级缓存配置
+  multi-level:
+    enabled: true
+    type: local-redis
+    expire-after-write: 3600
+    refresh-after-write: 1800
+    maximum-size: 10000
+  # 缓存预热配置
+  warmup:
+    enabled: true
+    batch-size: 100
+    max-retries: 3
+    retry-delay: 1000
+    types:
+      search:
+        enabled: true
+        key-pattern: "search:*"
+        concurrency: 2
+        timeout: 30000
+      inference:
+        enabled: true
+        key-pattern: "inference:*"
+        concurrency: 2
+        timeout: 30000
+      document:
+        enabled: true
+        key-pattern: "document:*"
+        concurrency: 2
+        timeout: 30000
+  # 缓存监控配置
+  monitor:
+    enabled: true
+    interval: 60000
+    alert-enabled: true
+    alert:
+      hit-rate-threshold: 80.0
+      max-load-time: 1000
+      max-eviction-count: 1000
+      notify-enabled: true
+      notify-type: log
+      notify-target: ""
+  # 缓存通知配置
+  notify:
+    enabled: true
+    type: log
+    email:
+      host: smtp.example.com
+      port: 25
+      username: cache@example.com
+      password: password
+      from: cache@example.com
+      to:
+        - admin@example.com
+      ssl: false
+    webhook:
+      url: http://example.com/webhook
+      method: POST
+      contentType: application/json
+      timeout: 5000
+      headers:
+        - Authorization: Bearer token 
