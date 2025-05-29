@@ -2,6 +2,7 @@ package com.marsreg.search.model;
 
 import lombok.Data;
 import lombok.Builder;
+import java.util.Map;
 
 @Data
 @Builder
@@ -14,17 +15,22 @@ public class SearchSuggestion {
     /**
      * 建议类型：KEYWORD-关键词, DOCUMENT-文档标题, TAG-标签
      */
-    private SuggestionType type;
+    private String type;
     
     /**
      * 相关度分数
      */
-    private float score;
+    private Double score;
     
     /**
-     * 额外信息（如文档ID、标签等）
+     * 分类
      */
-    private String extraInfo;
+    private String category;
+    
+    /**
+     * 元数据
+     */
+    private Map<String, Object> metadata;
     
     public enum SuggestionType {
         KEYWORD,

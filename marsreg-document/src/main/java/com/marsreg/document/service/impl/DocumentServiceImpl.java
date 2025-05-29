@@ -1,5 +1,7 @@
 package com.marsreg.document.service.impl;
 
+import com.marsreg.common.annotation.Log;
+import com.marsreg.common.annotation.Cache;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentContent;
@@ -33,6 +35,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentVectorService documentVectorService;
 
     @Override
+    @Log(module = "文档管理", operation = "上传", description = "上传文档")
     @Transactional
     public Document upload(MultipartFile file) {
         try {
@@ -63,12 +66,15 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
+    @Cache(name = "document", key = "#id", expire = 3600)
     public Document getById(Long id) {
         return documentRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("文档不存在"));
     }
 
     @Override
+    @Log(module = "文档管理", operation = "删除", description = "删除文档")
     @Transactional
     public void delete(Long id) {
         Document document = getById(id);

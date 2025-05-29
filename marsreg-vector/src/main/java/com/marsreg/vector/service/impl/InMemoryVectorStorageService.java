@@ -2,6 +2,7 @@ package com.marsreg.vector.service.impl;
 
 import com.marsreg.vector.service.VectorStorageService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -10,9 +11,10 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class VectorStorageServiceImpl implements VectorStorageService {
+@Profile("test")
+public class InMemoryVectorStorageService implements VectorStorageService {
 
-    // 使用内存存储作为示例，实际项目中应该使用 Milvus 等向量数据库
+    // 使用内存存储作为测试环境实现
     private final Map<String, float[]> vectorStore = new ConcurrentHashMap<>();
 
     @Override

@@ -1,5 +1,7 @@
 package com.marsreg.document.controller;
 
+import com.marsreg.common.annotation.Log;
+import com.marsreg.common.annotation.RateLimit;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.common.response.Result;
 import com.marsreg.document.entity.Document;
@@ -35,18 +37,24 @@ public class DocumentController {
 
     @Operation(summary = "上传文档")
     @PostMapping("/upload")
+    @Log(module = "文档管理", operation = "上传", description = "上传文档")
+    @RateLimit(key = "#request.file.originalFilename", limit = 100, time = 60)
     public Result<Document> upload(@RequestParam("file") MultipartFile file) {
         return Result.success(documentService.upload(file));
     }
 
     @Operation(summary = "获取文档信息")
     @GetMapping("/{id}")
+    @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
+    @RateLimit(limit = 200, time = 60)
     public Result<Document> getDocument(@PathVariable Long id) {
         return Result.success(documentService.getById(id));
     }
 
     @Operation(summary = "删除文档")
     @DeleteMapping("/{id}")
+    @Log(module = "文档管理", operation = "删除", description = "删除文档")
+    @RateLimit(limit = 50, time = 60)
     public Result<Void> deleteDocument(@PathVariable Long id) {
         documentService.delete(id);
         return Result.success();

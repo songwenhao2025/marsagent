@@ -1,6 +1,7 @@
 package com.marsreg.search.service.impl;
 
 import com.marsreg.search.model.UserBehaviorStats;
+import com.marsreg.search.model.UserBehaviorStats.RecentSearch;
 import com.marsreg.search.model.SearchType;
 import com.marsreg.search.service.UserBehaviorService;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +73,7 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
         List<UserBehaviorStats.KeywordStats> frequentKeywords = getUserFrequentKeywords(userId, 10);
         
         // 获取最近搜索记录
-        List<UserBehaviorStats.RecentSearch> recentSearches = getUserRecentSearches(userId, 10);
+        List<RecentSearch> recentSearches = getUserRecentSearches(userId, 10);
         
         return UserBehaviorStats.builder()
             .userId(userId)
@@ -175,7 +176,7 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
     }
 
     @Override
-    public List<UserBehaviorStats.RecentSearch> getUserRecentSearches(String userId, int size) {
+    public List<RecentSearch> getUserRecentSearches(String userId, int size) {
         List<String> recentSearches = redisTemplate.opsForList()
             .range(USER_RECENT_SEARCH_KEY + userId, 0, size - 1);
             
@@ -184,15 +185,15 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
         }
         
         return recentSearches.stream()
-            .map(this::parseRecentSearch)
+            .<RecentSearch>map(this::parseRecentSearch)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
     }
     
-    private UserBehaviorStats.RecentSearch parseRecentSearch(String record) {
+    private RecentSearch parseRecentSearch(String record) {
         try {
             String[] parts = record.split("\\|");
-            return UserBehaviorStats.RecentSearch.builder()
+            return RecentSearch.builder()
                 .query(parts[0])
                 .searchType(SearchType.valueOf(parts[1]))
                 .searchTime(LocalDateTime.parse(parts[2]))

@@ -1,15 +1,38 @@
+server:
+  port: 8082
+
 spring:
   application:
     name: marsreg-vector
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 10000
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1
+          max-idle: 8
+          min-idle: 0
 
 marsreg:
   vector:
-    # HuggingFace模型配置
+    # 模型配置
     model:
       name: sentence-transformers/all-MiniLM-L6-v2
+      version: 1.0.0
       dimension: 384
+      path: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+      device: cpu  # cpu 或 gpu
+      batch-size: 32
     # 线程池配置
     thread-pool-size: 4
+    # 缓存配置
+    cache:
+      enabled: true
+      expire: 3600
     # Milvus配置
     milvus:
       host: localhost
@@ -18,10 +41,15 @@ marsreg:
       dimension: 384
       # 认证配置
       auth:
-        enabled: true  # 启用认证
-        token: "97b59e4528a9eaf7a41d328ee07957659347638769623a3cf1a04c280838f469c702e946b865d6b88138f5727e3e7eb5547e9543"
+        enabled: true
+        token: "your-token"
       # 索引配置
       index:
         type: IVF_SQ8
         nlist: 1024
-        metric-type: COSINE 
+        metric-type: COSINE
+
+logging:
+  level:
+    com.marsreg.vector: INFO
+    ai.djl: INFO 

@@ -22,6 +22,9 @@
         <module>marsreg-common</module>
         <module>marsreg-vector</module>
         <module>marsreg-document</module>
+        <module>marsreg-search</module>
+        <module>marsreg-inference</module>
+        <module>marsreg-cache</module>
     </modules>
 
     <properties>

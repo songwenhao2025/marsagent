@@ -45,12 +45,6 @@ public class SearchRequest {
     private List<String> tags;
     private Map<String, Object> customFilters;
 
-    public enum SearchType {
-        VECTOR,
-        KEYWORD,
-        HYBRID
-    }
-
     @Data
     @Builder
     public static class SortField {

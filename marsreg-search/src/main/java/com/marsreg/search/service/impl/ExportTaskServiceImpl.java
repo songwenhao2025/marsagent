@@ -46,6 +46,9 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.lang.reflect.Field;
 import com.alibaba.fastjson.JSON;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import java.util.concurrent.LinkedBlockingQueue;
 
 @Slf4j
 @Service
@@ -2861,5 +2864,14 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         }
         
         return differences;
+    }
+
+    @Override
+    public Map<ExportFormat, Long> getExportFormatStatistics() {
+        Map<ExportFormat, Long> statistics = new HashMap<>();
+        for (ExportFormat format : ExportFormat.values()) {
+            statistics.put(format, 0L);
+        }
+        return statistics;
     }
 } 

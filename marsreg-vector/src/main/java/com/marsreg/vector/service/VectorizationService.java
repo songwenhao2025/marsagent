@@ -1,21 +1,53 @@
 package com.marsreg.vector.service;
 
 import java.util.List;
+import java.util.Map;
 
 public interface VectorizationService {
     /**
-     * 将文本转换为向量
+     * 文本向量化
      * @param text 输入文本
-     * @return 向量数组
+     * @return 向量
      */
-    float[] vectorize(String text);
+    List<Float> vectorize(String text);
 
     /**
-     * 批量将文本转换为向量
+     * 批量文本向量化
      * @param texts 输入文本列表
-     * @return 向量数组列表
+     * @return 向量列表
      */
-    List<float[]> batchVectorize(List<String> texts);
+    List<List<Float>> batchVectorize(List<String> texts);
+
+    /**
+     * 带缓存的文本向量化
+     * @param text 输入文本
+     * @return 向量
+     */
+    List<Float> vectorizeWithCache(String text);
+
+    /**
+     * 带缓存的批量文本向量化
+     * @param texts 输入文本列表
+     * @return 向量列表
+     */
+    List<List<Float>> batchVectorizeWithCache(List<String> texts);
+
+    /**
+     * 获取向量化模型信息
+     * @return 模型信息
+     */
+    Map<String, Object> getModelInfo();
+
+    /**
+     * 更新向量化模型
+     * @param modelPath 模型路径
+     */
+    void updateModel(String modelPath);
+
+    /**
+     * 预热向量化模型
+     */
+    void warmupModel();
 
     /**
      * 获取向量维度
