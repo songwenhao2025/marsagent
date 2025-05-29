@@ -1,0 +1,52 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: marsreg-search
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  data:
+    elasticsearch:
+      cluster-name: elasticsearch
+      cluster-nodes: localhost:9200
+      properties:
+        path.data: /tmp/elasticsearch/data
+        path.logs: /tmp/elasticsearch/logs
+  # Redis配置
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1
+        max-idle: 8
+        min-idle: 0
+
+# 检索服务配置
+search:
+  # 混合检索配置
+  hybrid:
+    # 向量检索权重
+    vector-weight: 0.7
+    # 关键词检索权重
+    keyword-weight: 0.3
+  # 检索结果配置
+  result:
+    # 默认返回结果数量
+    default-size: 10
+    # 最大返回结果数量
+    max-size: 100
+    # 最小相似度阈值
+    min-similarity: 0.5
+  # 缓存配置
+  cache:
+    # 是否启用缓存
+    enabled: true
+    # 缓存过期时间（秒）
+    expire-time: 3600 

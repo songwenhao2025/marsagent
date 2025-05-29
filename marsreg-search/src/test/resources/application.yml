@@ -1,0 +1,25 @@
+spring:
+  data:
+    elasticsearch:
+      cluster-name: elasticsearch
+      cluster-nodes: localhost:9200
+      properties:
+        path.data: /tmp/elasticsearch-test/data
+        path.logs: /tmp/elasticsearch-test/logs
+  elasticsearch:
+    rest:
+      uris: http://localhost:9200
+  cache:
+    type: simple
+
+search:
+  hybrid:
+    vector-weight: 0.7
+    keyword-weight: 0.3
+  result:
+    default-size: 10
+    max-size: 100
+    min-similarity: 0.5
+  cache:
+    enabled: true
+    expire-time: 3600 
