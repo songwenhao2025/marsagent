@@ -5,10 +5,21 @@ spring:
   application:
     name: marsreg-document
   datasource:
-    url: jdbc:mysql://localhost:3306/marsreg?useUnicode=true&characterEncoding=utf-8&useSSL=false
-    username: root
-    password: root
+    url: jdbc:mysql://rm-bp122j6l43ik18389bo.mysql.rds.aliyuncs.com:3306/mars_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: marsdb_2025
+    password: Mars2025
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 连接池最大连接数
+      maximum-pool-size: 20
+      # 最小空闲连接数
+      minimum-idle: 5
+      # 连接超时时间（毫秒）
+      connection-timeout: 30000
+      # 空闲连接超时时间（毫秒）
+      idle-timeout: 600000
+      # 连接最大生命周期（毫秒）
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: update
@@ -16,6 +27,16 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+        # 批量插入大小
+        jdbc.batch_size: 50
+        # 批量更新大小
+        order_inserts: true
+        order_updates: true
+        # 二级缓存配置
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
   servlet:
     multipart:
       max-file-size: 100MB
@@ -28,16 +49,19 @@ spring:
       time-to-live: 3600000
       # 缓存最大大小
       max-size: 1000
-
-minio:
-  endpoint: http://localhost:9000
-  accessKey: minioadmin
-  secretKey: minioadmin
-  bucket: marsreg
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 8
+        queue-capacity: 100
+        keep-alive: 60s
 
 logging:
   level:
     com.marsreg: debug
+    org.hibernate.SQL: debug
+    org.hibernate.type.descriptor.sql.BasicBinder: trace
 
 marsreg:
   document:
@@ -66,4 +90,40 @@ marsreg:
       # 是否异步索引
       async: true
       # 索引线程池大小
-      thread-pool-size: 4 
+      thread-pool-size: 4
+    rate-limit:
+      # 默认限流配置
+      default:
+        limit: 10
+        time-window: 60  # 秒
+      # 文件上传限流配置
+      upload:
+        limit: 5
+        time-window: 60  # 秒
+      # 文件下载限流配置
+      download:
+        limit: 20
+        time-window: 60  # 秒
+    alert:
+      failure-rate-threshold: 0.1
+      slow-upload-threshold: 5000
+    upload:
+      part-size: 5242880  # 5MB
+      temp-dir: ${java.io.tmpdir}/marsreg-uploads
+      max-retries: 3
+      retry-delay: 1000
+      compression:
+        enabled: true
+        quality: 0.8
+        max-width: 1920
+        max-height: 1080
+
+aliyun:
+  oss:
+    endpoint: ${OSS_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+    accessKeyId: ${OSS_ACCESS_KEY_ID}
+    accessKeySecret: ${OSS_ACCESS_KEY_SECRET}
+    bucketName: ${OSS_BUCKET_NAME}
+    urlExpiration: ${OSS_URL_EXPIRATION:3600}
+    maxFileSize: ${OSS_MAX_FILE_SIZE:10485760}  # 默认10MB
+    allowedFileTypes: ${OSS_ALLOWED_FILE_TYPES:jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,txt} 

@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+vector:
+  storage:
+    type: memory
+    dimension: 768
+    index-type: flat
+    metric-type: cosine
+
+search:
+  index:
+    path: test-index
+  cache:
+    enabled: true
+    type: caffeine
+    max-size: 1000
+    expire-seconds: 3600
+
+document:
+  storage:
+    type: local
+    path: test-storage
+  chunking:
+    max-size: 1000
+    overlap: 100 

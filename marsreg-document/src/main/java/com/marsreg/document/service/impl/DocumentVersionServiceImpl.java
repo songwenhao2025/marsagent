@@ -32,7 +32,7 @@ public class DocumentVersionServiceImpl implements DocumentVersionService {
     @Log(module = "文档版本", operation = "创建", description = "创建文档版本")
     @Transactional
     public DocumentVersion createVersion(Long documentId, String comment, String createdBy) {
-        Document document = documentService.getById(documentId);
+        Document document = documentService.getDocument(documentId);
         
         DocumentVersion version = DocumentVersion.builder()
             .documentId(documentId)
@@ -84,7 +84,7 @@ public class DocumentVersionServiceImpl implements DocumentVersionService {
     @Transactional
     public DocumentVersion restoreVersion(Long versionId) {
         DocumentVersion version = getVersion(versionId);
-        Document document = documentService.getById(version.getDocumentId());
+        Document document = documentService.getDocument(version.getDocumentId());
         
         // 创建新版本
         return createVersion(document.getId(), "从版本 " + version.getVersion() + " 恢复", version.getCreatedBy());

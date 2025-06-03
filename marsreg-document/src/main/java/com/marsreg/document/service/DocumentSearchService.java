@@ -9,7 +9,7 @@ import java.util.Map;
 
 public interface DocumentSearchService {
     /**
-     * 搜索文档
+     * 基础搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果
@@ -17,7 +17,7 @@ public interface DocumentSearchService {
     Page<Document> search(String query, Pageable pageable);
 
     /**
-     * 搜索文档内容
+     * 内容搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果
@@ -25,7 +25,7 @@ public interface DocumentSearchService {
     Page<Document> searchContent(String query, Pageable pageable);
 
     /**
-     * 搜索文档标题
+     * 标题搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果
@@ -33,7 +33,7 @@ public interface DocumentSearchService {
     Page<Document> searchTitle(String query, Pageable pageable);
 
     /**
-     * 搜索文档并高亮
+     * 带高亮的搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果，包含高亮片段
@@ -41,7 +41,7 @@ public interface DocumentSearchService {
     Page<Map<String, Object>> searchWithHighlight(String query, Pageable pageable);
 
     /**
-     * 搜索文档内容并高亮
+     * 带高亮的内容搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果，包含高亮片段
@@ -49,12 +49,30 @@ public interface DocumentSearchService {
     Page<Map<String, Object>> searchContentWithHighlight(String query, Pageable pageable);
 
     /**
-     * 搜索文档标题并高亮
+     * 带高亮的标题搜索
      * @param query 搜索关键词
      * @param pageable 分页参数
      * @return 文档分页结果，包含高亮片段
      */
     Page<Map<String, Object>> searchTitleWithHighlight(String query, Pageable pageable);
+
+    /**
+     * 向量搜索
+     * @param query 搜索查询
+     * @param limit 返回结果数量限制
+     * @param minScore 最小相似度分数
+     * @return 搜索结果列表，包含相似度分数
+     */
+    List<Map<String, Object>> vectorSearch(String query, int limit, float minScore);
+
+    /**
+     * 混合搜索（关键词 + 向量）
+     * @param query 搜索查询
+     * @param limit 返回结果数量限制
+     * @param minScore 最小相似度分数
+     * @return 搜索结果列表
+     */
+    List<Map<String, Object>> hybridSearch(String query, int limit, float minScore);
 
     /**
      * 获取搜索建议
@@ -79,4 +97,27 @@ public interface DocumentSearchService {
      * @return 建议列表
      */
     List<String> getContentSuggestions(String prefix, int limit);
+
+    /**
+     * 获取个性化搜索建议
+     * @param userId 用户ID
+     * @param prefix 搜索前缀
+     * @param limit 建议数量限制
+     * @return 建议列表
+     */
+    List<String> getPersonalizedSuggestions(String userId, String prefix, int limit);
+
+    /**
+     * 获取热门搜索建议
+     * @param limit 建议数量限制
+     * @return 建议列表
+     */
+    List<String> getHotSuggestions(int limit);
+
+    /**
+     * 记录搜索建议使用情况
+     * @param suggestion 被使用的建议
+     * @param userId 用户ID
+     */
+    void recordSuggestionUsage(String suggestion, String userId);
 } 

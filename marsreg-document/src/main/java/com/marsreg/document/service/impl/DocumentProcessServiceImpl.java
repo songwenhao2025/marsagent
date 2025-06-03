@@ -6,7 +6,7 @@ import com.marsreg.document.config.ChunkingConfig;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentChunk;
 import com.marsreg.document.entity.DocumentChunkMetadata;
-import com.marsreg.document.entity.DocumentStatus;
+import com.marsreg.document.enums.DocumentStatus;
 import com.marsreg.document.repository.DocumentChunkRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentIndexService;
@@ -78,7 +78,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
             String cleanedText = cleanText(text);
             
             // 更新状态为完成
-            document.setStatus(DocumentStatus.COMPLETED);
+            document.setStatus(DocumentStatus.ACTIVE);
             
             return document;
         } catch (Exception e) {

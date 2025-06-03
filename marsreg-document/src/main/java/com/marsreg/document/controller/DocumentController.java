@@ -4,6 +4,7 @@ import com.marsreg.common.annotation.Log;
 import com.marsreg.common.annotation.RateLimit;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.common.response.Result;
+import com.marsreg.document.dto.DocumentDTO;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentContent;
 import com.marsreg.document.entity.DocumentChunkMetadata;
@@ -39,25 +40,24 @@ public class DocumentController {
     @PostMapping("/upload")
     @Log(module = "文档管理", operation = "上传", description = "上传文档")
     @RateLimit(key = "#request.file.originalFilename", limit = 100, time = 60)
-    public Result<Document> upload(@RequestParam("file") MultipartFile file) {
-        return Result.success(documentService.upload(file));
+    public DocumentDTO uploadDocument(@RequestParam("file") MultipartFile file) {
+        return documentService.uploadDocument(file);
     }
 
     @Operation(summary = "获取文档信息")
     @GetMapping("/{id}")
     @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
     @RateLimit(limit = 200, time = 60)
-    public Result<Document> getDocument(@PathVariable Long id) {
-        return Result.success(documentService.getById(id));
+    public Document getDocument(@PathVariable Long id) {
+        return documentService.getDocument(id);
     }
 
     @Operation(summary = "删除文档")
     @DeleteMapping("/{id}")
     @Log(module = "文档管理", operation = "删除", description = "删除文档")
     @RateLimit(limit = 50, time = 60)
-    public Result<Void> deleteDocument(@PathVariable Long id) {
-        documentService.delete(id);
-        return Result.success();
+    public void deleteDocument(@PathVariable Long id) {
+        documentService.deleteDocument(id);
     }
 
     @Operation(summary = "获取文档内容")
@@ -75,16 +75,14 @@ public class DocumentController {
 
     @Operation(summary = "分页查询文档")
     @GetMapping
-    public Result<Page<Document>> list(Pageable pageable) {
-        return Result.success(documentService.list(pageable));
+    public Page<Document> listDocuments(Pageable pageable) {
+        return documentService.listDocuments(pageable);
     }
 
     @Operation(summary = "获取文档URL")
     @GetMapping("/{id}/url")
-    public Result<String> getDocumentUrl(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "3600") int expirySeconds) {
-        return Result.success(documentService.getDocumentUrl(id, expirySeconds));
+    public String getDocumentUrl(@PathVariable Long id, @RequestParam(defaultValue = "3600") int expirySeconds) {
+        return documentService.getDocumentUrl(id, expirySeconds);
     }
 
     @Operation(summary = "获取文档元数据")

@@ -1,5 +1,6 @@
 package com.marsreg.document.entity;
 
+import com.marsreg.document.enums.DocumentStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;

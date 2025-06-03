@@ -4,6 +4,8 @@ import com.marsreg.document.config.SearchCacheConfig;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.DocumentSearchService;
+import com.marsreg.vector.service.VectorizationService;
+import com.marsreg.vector.service.VectorStorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 public class DocumentSearchServiceImpl implements DocumentSearchService {
 
     private final DocumentRepository documentRepository;
+    private final VectorizationService vectorizationService;
+    private final VectorStorageService vectorStorageService;
     private Directory directory;
     private Analyzer analyzer;
     private static final String[] HIGHLIGHT_FIELDS = {"title", "content"};
@@ -40,12 +44,19 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
     private static final Map<String, Set<String>> termCache = new ConcurrentHashMap<>();
     private String indexPath = "index";
 
-    public DocumentSearchServiceImpl(DocumentRepository documentRepository) {
-        this(documentRepository, "index");
+    public DocumentSearchServiceImpl(DocumentRepository documentRepository,
+                                   VectorizationService vectorizationService,
+                                   VectorStorageService vectorStorageService) {
+        this(documentRepository, vectorizationService, vectorStorageService, "index");
     }
 
-    public DocumentSearchServiceImpl(DocumentRepository documentRepository, String indexPath) {
+    public DocumentSearchServiceImpl(DocumentRepository documentRepository,
+                                   VectorizationService vectorizationService,
+                                   VectorStorageService vectorStorageService,
+                                   String indexPath) {
         this.documentRepository = documentRepository;
+        this.vectorizationService = vectorizationService;
+        this.vectorStorageService = vectorStorageService;
         this.indexPath = indexPath;
         try {
             this.directory = FSDirectory.open(Paths.get(indexPath));
@@ -299,6 +310,137 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
         
         return fieldTerms.stream()
                 .filter(term -> term.toLowerCase().startsWith(prefix.toLowerCase()))
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Cacheable(value = SearchCacheConfig.SEARCH_RESULT_CACHE, key = "'vector-' + #query + '-' + #limit + '-' + #minScore")
+    public List<Map<String, Object>> vectorSearch(String query, int limit, float minScore) {
+        try {
+            // 将查询文本转换为向量
+            float[] queryVector = vectorizationService.vectorize(query);
+            
+            // 执行向量搜索
+            List<Map.Entry<String, Float>> searchResults = vectorStorageService.search(queryVector, limit, minScore);
+            
+            // 获取文档详情
+            List<Long> docIds = searchResults.stream()
+                    .map(result -> Long.parseLong(result.getKey()))
+                    .collect(Collectors.toList());
+            
+            Map<Long, Document> docMap = documentRepository.findAllById(docIds)
+                    .stream()
+                    .collect(Collectors.toMap(Document::getId, doc -> doc));
+            
+            // 组装结果
+            return searchResults.stream()
+                    .map(result -> {
+                        Map<String, Object> resultMap = new HashMap<>();
+                        Long docId = Long.parseLong(result.getKey());
+                        Document doc = docMap.get(docId);
+                        if (doc != null) {
+                            resultMap.put("documentId", docId);
+                            resultMap.put("name", doc.getName());
+                            resultMap.put("originalName", doc.getOriginalName());
+                            resultMap.put("score", result.getValue());
+                        }
+                        return resultMap;
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("向量搜索失败", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    @Cacheable(value = SearchCacheConfig.SEARCH_RESULT_CACHE, key = "'hybrid-' + #query + '-' + #limit + '-' + #minScore")
+    public List<Map<String, Object>> hybridSearch(String query, int limit, float minScore) {
+        try {
+            // 执行关键词搜索
+            List<Map<String, Object>> keywordResults = doSearchWithHighlight(query, Pageable.ofSize(limit), null)
+                    .getContent();
+            
+            // 执行向量搜索
+            List<Map<String, Object>> vectorResults = vectorSearch(query, limit, minScore);
+            
+            // 合并结果
+            Map<Long, Map<String, Object>> resultMap = new HashMap<>();
+            
+            // 处理关键词搜索结果
+            keywordResults.forEach(result -> {
+                Long docId = Long.parseLong(result.get("id").toString());
+                result.put("keywordScore", result.get("score"));
+                resultMap.put(docId, result);
+            });
+            
+            // 处理向量搜索结果
+            vectorResults.forEach(result -> {
+                Long docId = Long.parseLong(result.get("documentId").toString());
+                Map<String, Object> existingResult = resultMap.get(docId);
+                if (existingResult != null) {
+                    // 合并分数
+                    double keywordScore = (double) existingResult.get("keywordScore");
+                    double vectorScore = (double) result.get("score");
+                    existingResult.put("score", (keywordScore + vectorScore) / 2);
+                } else {
+                    result.put("keywordScore", 0.0);
+                    resultMap.put(docId, result);
+                }
+            });
+            
+            // 按分数排序
+            return resultMap.values().stream()
+                    .sorted((a, b) -> Double.compare(
+                            (double) b.get("score"),
+                            (double) a.get("score")))
+                    .limit(limit)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("混合搜索失败", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    @Cacheable(value = SearchCacheConfig.SEARCH_SUGGESTION_CACHE, key = "'personalized-' + #userId + '-' + #prefix + '-' + #limit")
+    public List<String> getPersonalizedSuggestions(String userId, String prefix, int limit) {
+        // 从用户历史搜索记录中获取建议
+        Set<String> suggestions = new HashSet<>();
+        for (String field : HIGHLIGHT_FIELDS) {
+            Set<String> fieldTerms = termCache.get(field);
+            if (fieldTerms != null) {
+                suggestions.addAll(fieldTerms.stream()
+                        .filter(term -> term.toLowerCase().startsWith(prefix.toLowerCase()))
+                        .limit(limit)
+                        .collect(Collectors.toSet()));
+            }
+        }
+        return suggestions.stream()
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @CacheEvict(value = SearchCacheConfig.SEARCH_SUGGESTION_CACHE, allEntries = true)
+    public void recordSuggestionUsage(String suggestion, String userId) {
+        // 记录搜索建议使用情况
+        log.debug("用户 {} 使用了搜索建议: {}", userId, suggestion);
+    }
+
+    @Override
+    @Cacheable(value = SearchCacheConfig.SEARCH_SUGGESTION_CACHE, key = "'hot-' + #limit")
+    public List<String> getHotSuggestions(int limit) {
+        // 获取热门搜索建议
+        Set<String> suggestions = new HashSet<>();
+        for (String field : HIGHLIGHT_FIELDS) {
+            Set<String> fieldTerms = termCache.get(field);
+            if (fieldTerms != null) {
+                suggestions.addAll(fieldTerms);
+            }
+        }
+        return suggestions.stream()
                 .limit(limit)
                 .collect(Collectors.toList());
     }

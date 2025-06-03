@@ -1,5 +1,6 @@
 package com.marsreg.document.service;
 
+import com.marsreg.document.dto.DocumentDTO;
 import com.marsreg.document.entity.Document;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,20 +12,20 @@ public interface DocumentService {
      * @param file 文件
      * @return 文档信息
      */
-    Document upload(MultipartFile file);
+    DocumentDTO uploadDocument(MultipartFile file);
 
     /**
-     * 根据ID获取文档
+     * 获取文档
      * @param id 文档ID
      * @return 文档信息
      */
-    Document getById(Long id);
+    Document getDocument(Long id);
 
     /**
      * 删除文档
      * @param id 文档ID
      */
-    void delete(Long id);
+    void deleteDocument(Long id);
 
     /**
      * 获取文档内容
@@ -36,9 +37,9 @@ public interface DocumentService {
     /**
      * 分页查询文档
      * @param pageable 分页参数
-     * @return 文档分页结果
+     * @return 文档分页信息
      */
-    Page<Document> list(Pageable pageable);
+    Page<Document> listDocuments(Pageable pageable);
 
     /**
      * 获取文档URL

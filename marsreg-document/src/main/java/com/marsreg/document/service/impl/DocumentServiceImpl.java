@@ -3,9 +3,10 @@ package com.marsreg.document.service.impl;
 import com.marsreg.common.annotation.Log;
 import com.marsreg.common.annotation.Cache;
 import com.marsreg.common.exception.BusinessException;
+import com.marsreg.document.dto.DocumentDTO;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentContent;
-import com.marsreg.document.entity.DocumentStatus;
+import com.marsreg.document.enums.DocumentStatus;
 import com.marsreg.document.repository.DocumentContentRepository;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.DocumentProcessService;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,38 +39,54 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Log(module = "文档管理", operation = "上传", description = "上传文档")
     @Transactional
-    public Document upload(MultipartFile file) {
-        try {
-            // 1. 保存文件到存储服务
-            String objectName = UUID.randomUUID().toString();
-            documentStorageService.storeFile(file, objectName);
+    public DocumentDTO uploadDocument(MultipartFile file) {
+        // 生成唯一文件名
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String objectName = UUID.randomUUID().toString() + extension;
 
-            // 2. 创建文档记录
-            Document document = new Document();
-            document.setName(file.getOriginalFilename());
-            document.setOriginalName(file.getOriginalFilename());
-            document.setContentType(file.getContentType());
-            document.setSize(file.getSize());
-            document.setStoragePath(objectName);
-            document.setStatus(DocumentStatus.PENDING);
-            document.setBucket(documentStorageService.getBucketName());
-            document.setObjectName(objectName);
-            document = documentRepository.save(document);
+        // 保存到存储服务
+        documentStorageService.storeFile(file, objectName);
 
-            // 3. 异步处理文档
-            documentProcessService.process(document);
+        // 创建文档记录
+        Document document = new Document();
+        document.setName(originalFilename);
+        document.setOriginalName(originalFilename);
+        document.setContentType(file.getContentType());
+        document.setSize(file.getSize());
+        document.setStoragePath(objectName);
+        document.setBucket(documentStorageService.getBucketName());
+        document.setObjectName(objectName);
+        document.setStatus(DocumentStatus.ACTIVE);
+        document.setVersion(1L);
+        document.setCreateTime(LocalDateTime.now());
+        document.setUpdateTime(LocalDateTime.now());
 
-            return document;
-        } catch (Exception e) {
-            log.error("文档上传失败", e);
-            throw new BusinessException("文档上传失败: " + e.getMessage());
-        }
+        // 保存到数据库
+        document = documentRepository.save(document);
+
+        // 转换为DTO
+        DocumentDTO dto = new DocumentDTO();
+        dto.setId(document.getId());
+        dto.setName(document.getName());
+        dto.setOriginalName(document.getOriginalName());
+        dto.setContentType(document.getContentType());
+        dto.setSize(document.getSize());
+        dto.setStoragePath(document.getStoragePath());
+        dto.setBucket(document.getBucket());
+        dto.setObjectName(document.getObjectName());
+        dto.setStatus(document.getStatus().name());
+        dto.setVersion(document.getVersion().intValue());
+        dto.setCreateTime(document.getCreateTime());
+        dto.setUpdateTime(document.getUpdateTime());
+
+        return dto;
     }
 
     @Override
     @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
     @Cache(name = "document", key = "#id", expire = 3600)
-    public Document getById(Long id) {
+    public Document getDocument(Long id) {
         return documentRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("文档不存在"));
     }
@@ -76,8 +94,8 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Log(module = "文档管理", operation = "删除", description = "删除文档")
     @Transactional
-    public void delete(Long id) {
-        Document document = getById(id);
+    public void deleteDocument(Long id) {
+        Document document = getDocument(id);
         
         try {
             // 1. 删除存储的文件
@@ -97,13 +115,13 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public Page<Document> list(Pageable pageable) {
+    public Page<Document> listDocuments(Pageable pageable) {
         return documentRepository.findAll(pageable);
     }
 
     @Override
     public String getDocumentUrl(Long id, int expirySeconds) {
-        Document document = getById(id);
+        Document document = getDocument(id);
         return documentStorageService.getFileUrl(document.getBucket(), document.getObjectName(), expirySeconds);
     }
 

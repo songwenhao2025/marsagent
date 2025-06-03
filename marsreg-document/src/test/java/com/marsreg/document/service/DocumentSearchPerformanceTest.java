@@ -3,6 +3,8 @@ package com.marsreg.document.service;
 import com.marsreg.document.entity.Document;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.impl.DocumentSearchServiceImpl;
+import com.marsreg.vector.service.VectorizationService;
+import com.marsreg.vector.service.VectorStorageService;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
@@ -57,7 +59,9 @@ class DocumentSearchPerformanceTest {
         // 初始化测试环境
         documentRepository = mock(DocumentRepository.class);
         directory = FSDirectory.open(testIndexPath);
-        searchService = new DocumentSearchServiceImpl(documentRepository, TEST_INDEX_PATH);
+        VectorizationService vectorizationService = mock(VectorizationService.class);
+        VectorStorageService vectorStorageService = mock(VectorStorageService.class);
+        searchService = new DocumentSearchServiceImpl(documentRepository, vectorizationService, vectorStorageService, TEST_INDEX_PATH);
 
         // 创建测试索引
         IndexWriterConfig config = new IndexWriterConfig();
