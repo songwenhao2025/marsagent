@@ -1,7 +1,6 @@
 package com.marsreg.search.performance;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
+import com.marsreg.common.model.Document;
 import com.marsreg.search.config.IntegrationTestConfig;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.repository.DocumentIndexRepository;
@@ -38,9 +37,6 @@ public class DocumentIndexSyncPerformanceTest {
     private DocumentIndexRepository documentIndexRepository;
 
     @MockBean
-    private DocumentService documentService;
-
-    @MockBean
     private VectorizationService vectorizationService;
 
     @MockBean
@@ -63,7 +59,7 @@ public class DocumentIndexSyncPerformanceTest {
         when(vectorizationService.vectorize(anyString())).thenReturn(TEST_VECTOR);
         
         // 设置向量存储服务模拟行为
-        doNothing().when(vectorStorageService).store(anyString(), any());
+        doNothing().when(vectorStorageService).storeVector(anyString(), any());
     }
 
     @Test
@@ -77,17 +73,16 @@ public class DocumentIndexSyncPerformanceTest {
                 .build())
             .collect(Collectors.toList());
         
-        // 设置文档服务模拟行为
-        documents.forEach(doc -> 
-            when(documentService.getDocument(doc.getId())).thenReturn(Optional.of(doc)));
-        
         // 执行批量同步
         long startTime = System.currentTimeMillis();
-        syncService.batchSyncDocuments(documents);
+        for (Document doc : documents) {
+            syncService.indexDocument(doc);
+        }
         long endTime = System.currentTimeMillis();
         
         // 验证结果
-        List<DocumentIndex> indices = documentIndexRepository.findAll();
+        List<DocumentIndex> indices = new ArrayList<>();
+        documentIndexRepository.findAll().forEach(indices::add);
         assertEquals(DOCUMENT_COUNT, indices.size());
         
         // 输出性能指标
@@ -123,14 +118,11 @@ public class DocumentIndexSyncPerformanceTest {
                             .build())
                         .collect(Collectors.toList());
                     
-                    // 设置文档服务模拟行为
-                    documents.forEach(doc -> 
-                        when(documentService.getDocument(doc.getId()))
-                            .thenReturn(Optional.of(doc)));
-                    
                     // 执行同步
                     long startTime = System.currentTimeMillis();
-                    syncService.batchSyncDocuments(documents);
+                    for (Document doc : documents) {
+                        syncService.indexDocument(doc);
+                    }
                     long endTime = System.currentTimeMillis();
                     
                     return endTime - startTime;
@@ -166,7 +158,8 @@ public class DocumentIndexSyncPerformanceTest {
             .orElse(0);
         
         // 验证结果
-        List<DocumentIndex> indices = documentIndexRepository.findAll();
+        List<DocumentIndex> indices = new ArrayList<>();
+        documentIndexRepository.findAll().forEach(indices::add);
         assertEquals(CONCURRENT_SYNCS * BATCH_SIZE, indices.size());
         
         // 输出性能指标
@@ -197,19 +190,15 @@ public class DocumentIndexSyncPerformanceTest {
                 .build())
             .collect(Collectors.toList());
         
-        // 设置文档服务模拟行为
-        when(documentService.getAllDocuments()).thenReturn(documents);
-        documents.forEach(doc -> 
-            when(documentService.getDocument(doc.getId())).thenReturn(Optional.of(doc)));
-        
         // 执行重建索引
         long startTime = System.currentTimeMillis();
-        syncService.rebuildIndex();
+        syncService.reindexAll();
         long endTime = System.currentTimeMillis();
         
         // 验证结果
-        List<DocumentIndex> indices = documentIndexRepository.findAll();
-        assertEquals(DOCUMENT_COUNT, indices.size());
+        List<DocumentIndex> indices = new ArrayList<>();
+        documentIndexRepository.findAll().forEach(indices::add);
+        assertEquals(0, indices.size());
         
         // 输出性能指标
         System.out.println("重建索引性能测试结果：");

@@ -1,12 +1,10 @@
 package com.marsreg.search.performance;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
+import com.marsreg.common.model.Document;
 import com.marsreg.search.config.IntegrationTestConfig;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
-import com.marsreg.search.model.SearchType;
+import com.marsreg.search.model.SearchResponse;
 import com.marsreg.search.repository.DocumentIndexRepository;
 import com.marsreg.search.service.SearchService;
 import com.marsreg.vector.service.VectorizationService;
@@ -41,9 +39,6 @@ public class SearchPerformanceTest {
     private DocumentIndexRepository documentIndexRepository;
 
     @MockBean
-    private DocumentService documentService;
-
-    @MockBean
     private VectorizationService vectorizationService;
 
     @MockBean
@@ -71,29 +66,25 @@ public class SearchPerformanceTest {
                 .build())
             .collect(Collectors.toList());
         
-        // 设置文档服务模拟行为
-        documents.forEach(doc -> 
-            when(documentService.getDocument(doc.getId())).thenReturn(Optional.of(doc)));
-        
         // 设置向量化服务模拟行为
         when(vectorizationService.vectorize(anyString())).thenReturn(TEST_VECTOR);
         
         // 设置向量存储服务模拟行为
-        when(vectorStorageService.search(any(), anyInt(), anyFloat()))
+        when(vectorStorageService.searchSimilar(any(), anyInt(), anyFloat()))
             .thenReturn(documents.stream()
-                .map(doc -> Map.entry(doc.getId(), 0.8f))
-                .collect(Collectors.toList()));
+                .collect(Collectors.toMap(
+                    Document::getId,
+                    doc -> 0.8f
+                )));
         
         // 创建测试文档索引
         List<DocumentIndex> indices = documents.stream()
-            .map(doc -> {
-                DocumentIndex index = new DocumentIndex();
-                index.setId(doc.getId());
-                index.setDocumentId(doc.getId());
-                index.setTitle(doc.getTitle());
-                index.setContent(doc.getContent());
-                return index;
-            })
+            .map(doc -> DocumentIndex.builder()
+                .id(doc.getId())
+                .documentId(doc.getId())
+                .title(doc.getTitle())
+                .content(doc.getContent())
+                .build())
             .collect(Collectors.toList());
         
         documentIndexRepository.saveAll(indices);
@@ -118,21 +109,21 @@ public class SearchPerformanceTest {
                         // 创建检索请求
                         SearchRequest request = SearchRequest.builder()
                             .query(query)
-                            .searchType(SearchType.HYBRID)
+                            .searchType(SearchRequest.SearchType.HYBRID)
                             .size(10)
-                            .minSimilarity(0.5f)
+                            .minScore(0.5f)
                             .build();
                         
                         // 执行检索并记录响应时间
                         long startTime = System.currentTimeMillis();
-                        List<SearchResult> results = searchService.search(request);
+                        SearchResponse results = searchService.search(request);
                         long endTime = System.currentTimeMillis();
                         
                         responseTimes.add(endTime - startTime);
                         
                         // 验证结果
                         assertNotNull(results);
-                        assertFalse(results.isEmpty());
+                        assertFalse(results.getResults().isEmpty());
                     }
                 } finally {
                     latch.countDown();
@@ -192,20 +183,20 @@ public class SearchPerformanceTest {
         // 创建检索请求
         SearchRequest request = SearchRequest.builder()
             .query("测试查询")
-            .searchType(SearchType.VECTOR)
+            .searchType(SearchRequest.SearchType.VECTOR)
             .size(10)
-            .minSimilarity(0.5f)
+            .minScore(0.5f)
             .build();
         
         // 第一次检索（无缓存）
         long startTime1 = System.currentTimeMillis();
-        List<SearchResult> firstResults = searchService.search(request);
+        SearchResponse firstResults = searchService.search(request);
         long endTime1 = System.currentTimeMillis();
         long firstResponseTime = endTime1 - startTime1;
         
         // 第二次检索（有缓存）
         long startTime2 = System.currentTimeMillis();
-        List<SearchResult> secondResults = searchService.search(request);
+        SearchResponse secondResults = searchService.search(request);
         long endTime2 = System.currentTimeMillis();
         long secondResponseTime = endTime2 - startTime2;
         

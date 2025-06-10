@@ -12,7 +12,11 @@
     <artifactId>marsreg-document</artifactId>
 
     <properties>
-        <springdoc.version>1.7.0</springdoc.version>
+        <elasticsearch.version>7.17.9</elasticsearch.version>
+        <spring-data-elasticsearch.version>5.1.3</spring-data-elasticsearch.version>
+        <java.version>17</java.version>
+        <tika.version>2.9.1</tika.version>
+        <aliyun.oss.version>3.16.1</aliyun.oss.version>
     </properties>
 
     <dependencies>
@@ -32,6 +36,11 @@
             <artifactId>marsreg-vector</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.marsreg</groupId>
+            <artifactId>marsreg-search</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Spring Boot -->
         <dependency>
@@ -41,6 +50,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -61,7 +74,7 @@
         <!-- Swagger -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
 
@@ -76,34 +89,34 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>2.9.1</version>
+            <version>${tika.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
-            <version>2.9.1</version>
+            <version>${tika.version}</version>
         </dependency>
 
         <!-- Lucene -->
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-core</artifactId>
-            <version>9.7.0</version>
+            <version>${lucene.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-analyzers-common</artifactId>
-            <version>8.11.2</version>
+            <version>${lucene.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-highlighter</artifactId>
-            <version>9.7.0</version>
+            <version>${lucene.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-queryparser</artifactId>
-            <version>9.7.0</version>
+            <version>${lucene.version}</version>
         </dependency>
 
         <!-- Test -->
@@ -117,7 +130,7 @@
         <dependency>
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
-            <version>3.16.1</version>
+            <version>${aliyun.oss.version}</version>
         </dependency>
 
         <!-- Spring Retry -->
@@ -145,6 +158,41 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Spring Data Elasticsearch -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-elasticsearch</artifactId>
+            <version>${spring-data-elasticsearch.version}</version>
+        </dependency>
+        
+        <!-- Javax Annotation API -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+        
+        <!-- Elasticsearch -->
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch</artifactId>
+            <version>${elasticsearch.version}</version>
+        </dependency>
+        
+        <!-- Elasticsearch REST Client -->
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-high-level-client</artifactId>
+            <version>${elasticsearch.version}</version>
+        </dependency>
+        
+        <!-- Elasticsearch Java API Client -->
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+            <version>${elasticsearch.version}</version>
         </dependency>
     </dependencies>
 

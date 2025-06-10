@@ -1,6 +1,6 @@
 package com.marsreg.search.service;
 
-import com.marsreg.document.model.Document;
+import com.marsreg.common.model.Document;
 
 public interface DocumentIndexSyncService {
     /**
@@ -8,7 +8,14 @@ public interface DocumentIndexSyncService {
      *
      * @param document 文档
      */
-    void syncDocument(Document document);
+    void indexDocument(Document document);
+
+    /**
+     * 更新文档到索引
+     *
+     * @param document 文档
+     */
+    void updateDocument(Document document);
 
     /**
      * 从索引中删除文档
@@ -18,14 +25,7 @@ public interface DocumentIndexSyncService {
     void deleteDocument(String documentId);
 
     /**
-     * 批量同步文档到索引
-     *
-     * @param documents 文档列表
-     */
-    void batchSyncDocuments(Iterable<Document> documents);
-
-    /**
      * 重建索引
      */
-    void rebuildIndex();
+    void reindexAll();
 } 

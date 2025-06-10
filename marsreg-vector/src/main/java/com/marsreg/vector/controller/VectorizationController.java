@@ -20,50 +20,65 @@ public class VectorizationController {
     @PostMapping("/vectorize")
     @Log(module = "向量化", operation = "向量化", description = "文本向量化")
     @RateLimit(limit = 100, time = 60)
-    public ApiResponse<List<Float>> vectorize(@RequestBody String text) {
-        return ApiResponse.success(vectorizationService.vectorize(text));
+    public ApiResponse<float[]> vectorize(@RequestBody String text) {
+        float[] result = vectorizationService.vectorize(text);
+        return ApiResponse.success(result);
     }
     
     @PostMapping("/batch-vectorize")
     @Log(module = "向量化", operation = "批量向量化", description = "批量文本向量化")
     @RateLimit(limit = 50, time = 60)
-    public ApiResponse<List<List<Float>>> batchVectorize(@RequestBody List<String> texts) {
-        return ApiResponse.success(vectorizationService.batchVectorize(texts));
+    public ApiResponse<List<float[]>> batchVectorize(@RequestBody List<String> texts) {
+        List<float[]> result = vectorizationService.batchVectorize(texts);
+        return ApiResponse.success(result);
     }
     
     @PostMapping("/vectorize-with-cache")
     @Log(module = "向量化", operation = "缓存向量化", description = "带缓存的文本向量化")
     @RateLimit(limit = 200, time = 60)
-    public ApiResponse<List<Float>> vectorizeWithCache(@RequestBody String text) {
-        return ApiResponse.success(vectorizationService.vectorizeWithCache(text));
+    public ApiResponse<float[]> vectorizeWithCache(@RequestBody String text) {
+        float[] result = vectorizationService.vectorizeWithCache(text);
+        return ApiResponse.success(result);
     }
     
     @PostMapping("/batch-vectorize-with-cache")
     @Log(module = "向量化", operation = "批量缓存向量化", description = "带缓存的批量文本向量化")
     @RateLimit(limit = 100, time = 60)
-    public ApiResponse<List<List<Float>>> batchVectorizeWithCache(@RequestBody List<String> texts) {
-        return ApiResponse.success(vectorizationService.batchVectorizeWithCache(texts));
+    public ApiResponse<List<float[]>> batchVectorizeWithCache(@RequestBody List<String> texts) {
+        List<float[]> result = vectorizationService.batchVectorizeWithCache(texts);
+        return ApiResponse.success(result);
     }
     
     @GetMapping("/model-info")
     @Log(module = "向量化", operation = "获取模型信息", description = "获取向量化模型信息")
     public ApiResponse<Map<String, Object>> getModelInfo() {
-        return ApiResponse.success(vectorizationService.getModelInfo());
+        Map<String, Object> result = vectorizationService.getModelInfo();
+        return ApiResponse.success(result);
     }
     
     @PostMapping("/update-model")
     @Log(module = "向量化", operation = "更新模型", description = "更新向量化模型")
-    @RateLimit(limit = 10, time = 60)
-    public ApiResponse<Void> updateModel(@RequestParam String modelPath) {
+    public ApiResponse<Void> updateModel(@RequestBody String modelPath) {
         vectorizationService.updateModel(modelPath);
-        return ApiResponse.success();
+        return ApiResponse.success(null);
     }
     
     @PostMapping("/warmup")
     @Log(module = "向量化", operation = "预热模型", description = "预热向量化模型")
-    @RateLimit(limit = 5, time = 60)
     public ApiResponse<Void> warmupModel() {
         vectorizationService.warmupModel();
-        return ApiResponse.success();
+        return ApiResponse.success(null);
     }
+}
+
+class VectorizationRequest {
+    private String text;
+    public String getText() { return text; }
+    public void setText(String text) { this.text = text; }
+}
+
+class BatchVectorizationRequest {
+    private java.util.List<String> texts;
+    public java.util.List<String> getTexts() { return texts; }
+    public void setTexts(java.util.List<String> texts) { this.texts = texts; }
 } 

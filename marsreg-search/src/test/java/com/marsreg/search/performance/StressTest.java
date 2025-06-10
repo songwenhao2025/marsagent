@@ -1,12 +1,10 @@
 package com.marsreg.search.performance;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
+import com.marsreg.common.model.Document;
 import com.marsreg.search.config.IntegrationTestConfig;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
-import com.marsreg.search.model.SearchType;
+import com.marsreg.search.model.SearchResponse;
 import com.marsreg.search.repository.DocumentIndexRepository;
 import com.marsreg.search.service.DocumentIndexSyncService;
 import com.marsreg.search.service.SearchService;
@@ -45,9 +43,6 @@ public class StressTest {
     private DocumentIndexRepository documentIndexRepository;
 
     @MockBean
-    private DocumentService documentService;
-
-    @MockBean
     private VectorizationService vectorizationService;
 
     @MockBean
@@ -76,30 +71,25 @@ public class StressTest {
                 .build())
             .collect(Collectors.toList());
         
-        // 设置文档服务模拟行为
-        documents.forEach(doc -> 
-            when(documentService.getDocument(doc.getId())).thenReturn(Optional.of(doc)));
-        when(documentService.getAllDocuments()).thenReturn(documents);
-        
         // 设置向量化服务模拟行为
         when(vectorizationService.vectorize(anyString())).thenReturn(TEST_VECTOR);
         
         // 设置向量存储服务模拟行为
-        when(vectorStorageService.search(any(), anyInt(), anyFloat()))
+        when(vectorStorageService.searchSimilar(any(), anyInt(), anyFloat()))
             .thenReturn(documents.stream()
-                .map(doc -> Map.entry(doc.getId(), 0.8f))
-                .collect(Collectors.toList()));
+                .collect(Collectors.toMap(
+                    Document::getId,
+                    doc -> 0.8f
+                )));
         
         // 创建测试文档索引
         List<DocumentIndex> indices = documents.stream()
-            .map(doc -> {
-                DocumentIndex index = new DocumentIndex();
-                index.setId(doc.getId());
-                index.setDocumentId(doc.getId());
-                index.setTitle(doc.getTitle());
-                index.setContent(doc.getContent());
-                return index;
-            })
+            .map(doc -> DocumentIndex.builder()
+                .id(doc.getId())
+                .documentId(doc.getId())
+                .title(doc.getTitle())
+                .content(doc.getContent())
+                .build())
             .collect(Collectors.toList());
         
         documentIndexRepository.saveAll(indices);
@@ -199,14 +189,14 @@ public class StressTest {
         String query = "测试查询" + new Random().nextInt(DOCUMENT_COUNT);
         SearchRequest request = SearchRequest.builder()
             .query(query)
-            .searchType(SearchType.HYBRID)
+            .searchType(SearchRequest.SearchType.HYBRID)
             .size(10)
-            .minSimilarity(0.5f)
+            .minScore(0.5f)
             .build();
         
-        List<SearchResult> results = searchService.search(request);
+        SearchResponse results = searchService.search(request);
         assertNotNull(results);
-        assertFalse(results.isEmpty());
+        assertFalse(results.getResults().isEmpty());
     }
     
     private void performSync(TestResult result) {
@@ -218,11 +208,13 @@ public class StressTest {
                 .build())
             .collect(Collectors.toList());
         
-        syncService.batchSyncDocuments(documents);
+        for (Document doc : documents) {
+            syncService.indexDocument(doc);
+        }
     }
     
     private void performRebuild(TestResult result) {
-        syncService.rebuildIndex();
+        syncService.reindexAll();
     }
     
     private enum TestType {

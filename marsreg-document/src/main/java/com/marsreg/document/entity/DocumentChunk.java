@@ -1,6 +1,7 @@
 package com.marsreg.document.entity;
 
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -8,6 +9,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Data
+@Slf4j
 @Entity
 @Table(name = "document_chunks")
 public class DocumentChunk {
@@ -15,14 +17,18 @@ public class DocumentChunk {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "document_id", nullable = false)
-    private Long documentId;
+    @ManyToOne
+    @JoinColumn(name = "document_id")
+    private DocumentEntity document;
 
-    @Column(name = "chunk_index", nullable = false)
+    @Column(name = "chunk_index")
     private Integer chunkIndex;
 
-    @Column(name = "content", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "content", columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "vector", columnDefinition = "TEXT")
+    private String vector;
 
     @Column(name = "word_count")
     private Integer wordCount;

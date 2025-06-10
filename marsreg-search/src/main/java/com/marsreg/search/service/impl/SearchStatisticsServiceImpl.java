@@ -83,12 +83,12 @@ public class SearchStatisticsServiceImpl implements SearchStatisticsService {
         List<SearchStatistics.KeywordStats> hotKeywords = getHotKeywords(10);
         
         return SearchStatistics.builder()
-            .searchCount(searchCount != null ? searchCount : 0)
+            .totalSearches(searchCount != null ? searchCount : 0)
             .averageResponseTime(avgResponseTime)
             .searchTypeDistribution(searchTypeDistribution)
             .documentTypeDistribution(documentTypeDistribution)
             .timeRangeStats(timeRangeStats)
-            .hotKeywords(hotKeywords)
+            .topKeywords(hotKeywords)
             .build();
     }
 

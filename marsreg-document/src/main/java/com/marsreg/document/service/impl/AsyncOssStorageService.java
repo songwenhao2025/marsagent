@@ -3,7 +3,7 @@ package com.marsreg.document.service.impl;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectRequest;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.metrics.UploadMetrics;
 import com.marsreg.document.service.DocumentStorageService;
 import com.marsreg.document.upload.DefaultUploadProgressListener;
@@ -42,7 +42,7 @@ public class AsyncOssStorageService {
     }
 
     @Async
-    public CompletableFuture<Document> uploadAsync(MultipartFile file) {
+    public CompletableFuture<DocumentEntity> uploadAsync(MultipartFile file) {
         return CompletableFuture.supplyAsync(() -> {
             uploadMetrics.recordUploadAttempt();
             long startTime = System.currentTimeMillis();
@@ -91,13 +91,13 @@ public class AsyncOssStorageService {
                     progressListener.onSuccess();
                 }
                 
-                Document document = new Document();
+                DocumentEntity document = new DocumentEntity();
                 document.setName(UUID.randomUUID().toString());
                 document.setOriginalName(originalFilename);
                 document.setContentType(file.getContentType());
                 document.setSize(metadata.getContentLength());
-                document.setStoragePath(objectName);
-                document.setBucket(bucketName);
+                // document.setStoragePath(objectName);
+                // document.setBucket(bucketName);
                 document.setObjectName(objectName);
                 
                 uploadMetrics.recordUploadSuccess();
@@ -112,5 +112,15 @@ public class AsyncOssStorageService {
                 throw new RuntimeException("文件上传失败", e);
             }
         });
+    }
+
+    @Async
+    public void asyncSaveDocument(DocumentEntity document, InputStream inputStream) {
+        documentStorageService.saveDocument(document, inputStream);
+    }
+
+    @Async
+    public void asyncDeleteDocument(DocumentEntity document) {
+        documentStorageService.deleteDocument(document);
     }
 } 

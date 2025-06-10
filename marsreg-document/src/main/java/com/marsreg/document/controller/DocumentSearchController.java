@@ -1,13 +1,14 @@
 package com.marsreg.document.controller;
 
 import com.marsreg.common.response.Result;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.service.DocumentSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,15 +24,13 @@ public class DocumentSearchController {
 
     @Operation(summary = "搜索文档")
     @GetMapping
-    public Result<Page<Document>> search(
-            @RequestParam String query,
-            Pageable pageable) {
-        return Result.success(documentSearchService.search(query, pageable));
+    public ResponseEntity<Page<DocumentEntity>> search(@RequestParam String keyword, Pageable pageable) {
+        return ResponseEntity.ok(documentSearchService.search(keyword, pageable));
     }
 
     @Operation(summary = "搜索文档内容")
     @GetMapping("/content")
-    public Result<Page<Document>> searchContent(
+    public Result<Page<DocumentEntity>> searchContent(
             @RequestParam String query,
             Pageable pageable) {
         return Result.success(documentSearchService.searchContent(query, pageable));
@@ -39,7 +38,7 @@ public class DocumentSearchController {
 
     @Operation(summary = "搜索文档标题")
     @GetMapping("/title")
-    public Result<Page<Document>> searchTitle(
+    public Result<Page<DocumentEntity>> searchTitle(
             @RequestParam String query,
             Pageable pageable) {
         return Result.success(documentSearchService.searchTitle(query, pageable));
@@ -91,5 +90,15 @@ public class DocumentSearchController {
             @RequestParam String prefix,
             @RequestParam(defaultValue = "10") int limit) {
         return Result.success(documentSearchService.getContentSuggestions(prefix, limit));
+    }
+
+    @PostMapping("/advanced")
+    public ResponseEntity<Page<DocumentEntity>> advancedSearch(@RequestBody Map<String, Object> criteria, Pageable pageable) {
+        return ResponseEntity.ok(documentSearchService.advancedSearch(criteria, pageable));
+    }
+
+    @GetMapping("/similar/{documentId}")
+    public ResponseEntity<Page<DocumentEntity>> findSimilar(@PathVariable Long documentId, Pageable pageable) {
+        return ResponseEntity.ok(documentSearchService.findSimilar(documentId, pageable));
     }
 } 

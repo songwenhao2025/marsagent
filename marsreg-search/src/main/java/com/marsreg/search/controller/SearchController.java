@@ -1,73 +1,43 @@
 package com.marsreg.search.controller;
 
-import com.marsreg.search.model.*;
+import com.marsreg.search.model.SearchRequest;
+import com.marsreg.search.model.SearchResponse;
 import com.marsreg.search.service.SearchService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import java.util.stream.Collectors;
 
+@Tag(name = "搜索服务", description = "提供文档搜索功能")
 @RestController
 @RequestMapping("/api/search")
+@RequiredArgsConstructor
 public class SearchController {
+
     private final SearchService searchService;
-    
-    public SearchController(SearchService searchService) {
-        this.searchService = searchService;
+
+    @Operation(summary = "执行搜索", description = "支持关键词搜索、向量搜索和混合搜索")
+    @PostMapping
+    public SearchResponse search(@Valid @RequestBody SearchRequest request) {
+        return searchService.search(request);
     }
-    
-    @PostMapping("/vector")
-    public SearchResponse vectorSearch(@RequestBody SearchRequest request) {
-        SearchRequest searchRequest = new SearchRequest();
-        searchRequest.setQuery(request.getQuery());
-        searchRequest.setSearchType(SearchType.VECTOR);
-        searchRequest.setSize(request.getSize());
-        searchRequest.setMinSimilarity(request.getMinSimilarity());
-        searchRequest.setFilter(request.getFilter());
-        searchRequest.setSortFields(request.getSortFields().stream()
-            .map(field -> {
-                SearchRequest.SortField sortField = new SearchRequest.SortField();
-                sortField.setField(field.getField());
-                sortField.setOrder(field.getOrder());
-                return sortField;
-            })
-            .collect(Collectors.toList()));
-        return searchService.search(searchRequest);
-    }
-    
+
+    @Operation(summary = "关键词搜索", description = "使用关键词进行全文搜索")
     @PostMapping("/keyword")
-    public SearchResponse keywordSearch(@RequestBody SearchRequest request) {
-        SearchRequest searchRequest = new SearchRequest();
-        searchRequest.setQuery(request.getQuery());
-        searchRequest.setSearchType(SearchType.KEYWORD);
-        searchRequest.setSize(request.getSize());
-        searchRequest.setFilter(request.getFilter());
-        searchRequest.setSortFields(request.getSortFields().stream()
-            .map(field -> {
-                SearchRequest.SortField sortField = new SearchRequest.SortField();
-                sortField.setField(field.getField());
-                sortField.setOrder(field.getOrder());
-                return sortField;
-            })
-            .collect(Collectors.toList()));
-        return searchService.search(searchRequest);
+    public SearchResponse keywordSearch(@Valid @RequestBody SearchRequest request) {
+        return searchService.keywordSearch(request);
     }
-    
+
+    @Operation(summary = "向量搜索", description = "使用向量进行语义搜索")
+    @PostMapping("/vector")
+    public SearchResponse vectorSearch(@Valid @RequestBody SearchRequest request) {
+        return searchService.vectorSearch(request);
+    }
+
+    @Operation(summary = "混合搜索", description = "结合关键词和向量进行混合搜索")
     @PostMapping("/hybrid")
-    public SearchResponse hybridSearch(@RequestBody SearchRequest request) {
-        SearchRequest searchRequest = new SearchRequest();
-        searchRequest.setQuery(request.getQuery());
-        searchRequest.setSearchType(SearchType.HYBRID);
-        searchRequest.setSize(request.getSize());
-        searchRequest.setMinSimilarity(request.getMinSimilarity());
-        searchRequest.setFilter(request.getFilter());
-        searchRequest.setSortFields(request.getSortFields().stream()
-            .map(field -> {
-                SearchRequest.SortField sortField = new SearchRequest.SortField();
-                sortField.setField(field.getField());
-                sortField.setOrder(field.getOrder());
-                return sortField;
-            })
-            .collect(Collectors.toList()));
-        return searchService.search(searchRequest);
+    public SearchResponse hybridSearch(@Valid @RequestBody SearchRequest request) {
+        return searchService.hybridSearch(request);
     }
 } 

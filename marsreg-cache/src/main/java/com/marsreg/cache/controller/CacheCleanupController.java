@@ -1,6 +1,7 @@
 package com.marsreg.cache.controller;
 
 import com.marsreg.cache.service.CacheCleanupService;
+import com.marsreg.cache.service.CacheCleanupService.CleanupResult;
 import com.marsreg.cache.service.CacheCleanupService.CleanupStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +23,7 @@ public class CacheCleanupController {
      * 清理指定类型的缓存
      */
     @PostMapping("/type/{type}")
-    public ResponseEntity<Long> cleanupByType(@PathVariable String type) {
+    public ResponseEntity<CleanupResult> cleanupByType(@PathVariable String type) {
         return ResponseEntity.ok(cacheCleanupService.cleanupByType(type));
     }
 
@@ -30,7 +31,7 @@ public class CacheCleanupController {
      * 清理所有缓存
      */
     @PostMapping("/all")
-    public ResponseEntity<Long> cleanupAll() {
+    public ResponseEntity<CleanupResult> cleanupAll() {
         return ResponseEntity.ok(cacheCleanupService.cleanupAll());
     }
 
@@ -38,7 +39,7 @@ public class CacheCleanupController {
      * 按模式清理缓存
      */
     @PostMapping("/pattern")
-    public ResponseEntity<Long> cleanupByPattern(@RequestParam String pattern) {
+    public ResponseEntity<CleanupResult> cleanupByPattern(@RequestParam String pattern) {
         return ResponseEntity.ok(cacheCleanupService.cleanupByPattern(pattern));
     }
 
@@ -46,7 +47,7 @@ public class CacheCleanupController {
      * 清理指定的键列表
      */
     @PostMapping("/keys")
-    public ResponseEntity<Long> cleanupByKeys(@RequestBody List<String> keys) {
+    public ResponseEntity<CleanupResult> cleanupByKeys(@RequestBody List<String> keys) {
         return ResponseEntity.ok(cacheCleanupService.cleanupByKeys(keys));
     }
 
@@ -54,7 +55,7 @@ public class CacheCleanupController {
      * 清理过期的缓存
      */
     @PostMapping("/expired")
-    public ResponseEntity<Long> cleanupExpired() {
+    public ResponseEntity<CleanupResult> cleanupExpired() {
         return ResponseEntity.ok(cacheCleanupService.cleanupExpired());
     }
 

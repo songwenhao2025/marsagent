@@ -1,5 +1,6 @@
 package com.marsreg.vector.cache.eviction;
 
+import com.marsreg.vector.cache.CacheEntry;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -68,5 +69,11 @@ public class ARCvictionStrategy implements CacheEvictionStrategy {
         } else {
             t1.put(key, 1);
         }
+    }
+
+    @Override
+    public String evict(Map<String, CacheEntry> cache) {
+        // 简单实现，实际可根据ARC算法优化
+        return cache.keySet().stream().findFirst().orElse(null);
     }
 } 

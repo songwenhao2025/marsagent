@@ -1,6 +1,9 @@
 package com.marsreg.search.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marsreg.search.service.impl.ExportTaskServiceImpl;
+import com.marsreg.search.service.ExportTaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,17 +34,19 @@ class ExportTaskServiceTest {
     private ValueOperations<String, String> valueOperations;
 
     @Mock
-    private HashOperations<String, Object, Object> hashOperations;
+    private HashOperations<String, String, String> hashOperations;
 
     @Mock
-    private ListOperations<String, Object> listOperations;
+    private ListOperations<String, String> listOperations;
 
     private ExportTaskService exportTaskService;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
+        objectMapper = new ObjectMapper();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         
         exportTaskService = new ExportTaskServiceImpl(dataExportService, redisTemplate);
@@ -95,21 +100,21 @@ class ExportTaskServiceTest {
     @Test
     void getTaskMetrics_ShouldReturnMetrics() {
         // 准备测试数据
-        String taskId = "test-task-id";
-        Map<Object, Object> resultMap = new HashMap<>();
-        resultMap.put("taskId", taskId);
-        resultMap.put("status", "COMPLETED");
-        resultMap.put("createTime", LocalDateTime.now().toString());
+        Map<String, String> metrics = new HashMap<>();
+        metrics.put("status", "COMPLETED");
+        metrics.put("progress", "100");
+        metrics.put("startTime", LocalDateTime.now().toString());
+        metrics.put("endTime", LocalDateTime.now().toString());
 
-        when(hashOperations.entries(anyString())).thenReturn(resultMap);
+        when(hashOperations.entries(anyString())).thenReturn(metrics);
 
         // 执行测试
-        Map<String, Object> metrics = exportTaskService.getTaskMetrics(taskId);
+        Map<String, Object> result = exportTaskService.getTaskMetrics("task1");
 
         // 验证结果
-        assertNotNull(metrics);
-        assertTrue(metrics.containsKey("status"));
-        verify(hashOperations).entries(anyString());
+        assertNotNull(result);
+        assertEquals("COMPLETED", result.get("status"));
+        assertEquals("100", result.get("progress"));
     }
 
     @Test
@@ -128,13 +133,14 @@ class ExportTaskServiceTest {
     }
 
     @Test
-    void getAlertRules_ShouldReturnAllRules() {
+    void getAlertRules_ShouldReturnAllRules() throws JsonProcessingException {
         // 准备测试数据
-        List<Object> rules = new ArrayList<>();
-        Map<String, Object> rule = new HashMap<>();
-        rule.put("type", "EXECUTION_TIME");
-        rule.put("threshold", 3600);
-        rules.add(rule);
+        List<String> rules = new ArrayList<>();
+        Map<String, String> rule = new HashMap<>();
+        rule.put("id", "rule1");
+        rule.put("name", "测试规则");
+        rule.put("condition", "cpu > 80");
+        rules.add(objectMapper.writeValueAsString(rule));
 
         when(listOperations.range(anyString(), anyLong(), anyLong())).thenReturn(rules);
 
@@ -145,26 +151,24 @@ class ExportTaskServiceTest {
         assertNotNull(result);
         assertFalse(result.isEmpty());
         assertEquals(1, result.size());
-        verify(listOperations).range(anyString(), anyLong(), anyLong());
+        assertEquals("rule1", result.get(0).get("id"));
     }
 
     @Test
-    void testAlertNotification_ShouldReturnTrue() {
+    void testAlertNotification_ShouldReturnTrue() throws JsonProcessingException {
         // 准备测试数据
-        Map<String, Object> notification = new HashMap<>();
-        notification.put("method", "EMAIL");
-        Map<String, Object> config = new HashMap<>();
-        config.put("recipients", Arrays.asList("test@example.com"));
-        notification.put("config", config);
+        Map<String, String> notification = new HashMap<>();
+        notification.put("type", "email");
+        notification.put("recipients", "test@example.com");
+        notification.put("config", objectMapper.writeValueAsString(new HashMap<>()));
 
-        when(valueOperations.get(anyString())).thenReturn(notification);
+        when(valueOperations.get(anyString())).thenReturn(objectMapper.writeValueAsString(notification));
 
         // 执行测试
         boolean result = exportTaskService.testAlertNotification();
 
         // 验证结果
         assertTrue(result);
-        verify(valueOperations).get(anyString());
     }
 
     @Test

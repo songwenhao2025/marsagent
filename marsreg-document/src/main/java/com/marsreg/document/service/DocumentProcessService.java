@@ -1,30 +1,36 @@
 package com.marsreg.document.service;
 
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import java.io.InputStream;
 import java.util.List;
 
 public interface DocumentProcessService {
     /**
      * 处理文档
-     * @param document 文档对象
-     * @return 处理后的文档
+     * @param document 文档实体
+     * @return 处理后的文档实体
      */
-    Document process(Document document);
+    DocumentEntity process(DocumentEntity document);
 
     /**
-     * 处理文档
+     * 批量处理文档
+     * @param documents 文档实体列表
+     */
+    void processBatch(List<DocumentEntity> documents);
+
+    /**
+     * 处理文档并返回文本内容
      * @param document 文档对象
      * @return 处理后的文本内容
      */
-    String processDocument(Document document);
+    String processDocument(DocumentEntity document);
 
     /**
-     * 提取文本
-     * @param document 文档对象
-     * @return 提取的文本内容
+     * 提取文档文本
+     * @param document 文档实体
+     * @return 提取的文本
      */
-    String extractText(Document document);
+    String extractText(DocumentEntity document);
 
     /**
      * 提取文本
@@ -36,35 +42,35 @@ public interface DocumentProcessService {
 
     /**
      * 清洗文本
-     * @param text 原始文本
+     * @param text 输入文本
      * @return 清洗后的文本
      */
     String cleanText(String text);
 
     /**
-     * 检测语言
-     * @param text 文本内容
-     * @return 语言代码（如：zh-CN, en-US）
+     * 检测文本语言
+     * @param text 输入文本
+     * @return 语言代码
      */
     String detectLanguage(String text);
 
     /**
-     * 基本分块
-     * @param text 文本内容
-     * @param chunkSize 分块大小
-     * @param overlapSize 重叠大小
-     * @return 分块列表
+     * 文本分块
+     * @param text 输入文本
+     * @param maxChunkSize 最大块大小
+     * @param overlap 重叠大小
+     * @return 文本块列表
      */
-    List<String> chunkText(String text, int chunkSize, int overlapSize);
+    List<String> chunkText(String text, int maxChunkSize, int overlap);
 
     /**
-     * 智能分块
-     * @param text 文本内容
-     * @param maxChunkSize 最大分块大小
-     * @param minChunkSize 最小分块大小
-     * @return 分块列表
+     * 智能文本分块
+     * @param text 输入文本
+     * @param maxChunkSize 最大块大小
+     * @param overlap 重叠大小
+     * @return 文本块列表
      */
-    List<String> smartChunkText(String text, int maxChunkSize, int minChunkSize);
+    List<String> smartChunkText(String text, int maxChunkSize, int overlap);
 
     /**
      * 保存文档分块
@@ -86,4 +92,10 @@ public interface DocumentProcessService {
      * @param documentId 文档ID
      */
     void clearChunksCache(Long documentId);
+
+    /**
+     * 清除文档缓存
+     * @param documentId 文档ID
+     */
+    void clearDocumentCache(Long documentId);
 } 

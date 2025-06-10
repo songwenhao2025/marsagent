@@ -1,23 +1,30 @@
 package com.marsreg.document.service;
 
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import java.util.List;
 import java.util.Map;
 
 public interface DocumentIndexService {
     /**
      * 索引单个文档
-     * @param document 文档
-     * @param chunks 文档分块
+     * @param document 文档实体
+     * @param fields 需要索引的字段列表
      */
-    void indexDocument(Document document, List<String> chunks);
+    void indexDocument(DocumentEntity document, List<String> fields);
 
     /**
      * 批量索引文档
-     * @param documents 文档列表
-     * @param chunksMap 文档分块映射
+     * @param documents 文档实体列表
+     * @param fieldsMap 每个文档需要索引的字段映射
      */
-    void indexDocuments(List<Document> documents, Map<Long, List<String>> chunksMap);
+    void indexDocuments(List<DocumentEntity> documents, Map<Long, List<String>> fieldsMap);
+
+    /**
+     * 更新文档索引
+     * @param document 文档实体
+     * @param fields 需要更新的字段列表
+     */
+    void updateIndex(DocumentEntity document, List<String> fields);
 
     /**
      * 删除文档索引
@@ -26,33 +33,23 @@ public interface DocumentIndexService {
     void deleteIndex(Long documentId);
 
     /**
+     * 批量索引文档
+     * @param documents 文档实体列表
+     */
+    void batchIndex(Iterable<DocumentEntity> documents);
+
+    /**
      * 批量删除文档索引
      * @param documentIds 文档ID列表
      */
     void deleteIndices(List<Long> documentIds);
 
     /**
-     * 更新文档索引
-     * @param document 文档
-     * @param chunks 文档分块
-     */
-    void updateIndex(Document document, List<String> chunks);
-
-    /**
      * 批量更新文档索引
      * @param documents 文档列表
      * @param chunksMap 文档分块映射
      */
-    void updateIndices(List<Document> documents, Map<Long, List<String>> chunksMap);
-
-    /**
-     * 搜索文档
-     * @param query 搜索查询
-     * @param page 页码
-     * @param size 每页大小
-     * @return 文档ID列表
-     */
-    List<Long> search(String query, int page, int size);
+    void updateIndices(List<DocumentEntity> documents, Map<Long, List<String>> chunksMap);
 
     /**
      * 刷新索引
@@ -80,4 +77,23 @@ public interface DocumentIndexService {
      * @return 索引状态信息
      */
     Map<String, Object> checkIndexStatus();
+
+    /**
+     * 清除文档缓存
+     * @param documentId 文档ID
+     */
+    void clearDocumentCache(Long documentId);
+
+    /**
+     * 检查文档是否已索引
+     * @param documentId 文档ID
+     * @return 是否已索引
+     */
+    boolean isIndexed(Long documentId);
+
+    /**
+     * 更新文档索引
+     * @param document 文档实体
+     */
+    void updateDocumentIndex(DocumentEntity document);
 } 

@@ -2,7 +2,7 @@ package com.marsreg.document.service.impl;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.*;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.metrics.UploadMetrics;
 import com.marsreg.document.service.DocumentStorageService;
 import com.marsreg.document.upload.DefaultUploadProgressListener;
@@ -43,7 +43,7 @@ public class ResumableOssStorageService {
         this.documentStorageService = documentStorageService;
     }
 
-    public Document uploadWithResume(MultipartFile file) throws IOException {
+    public DocumentEntity uploadWithResume(MultipartFile file) throws IOException {
         uploadMetrics.recordUploadAttempt();
         long startTime = System.currentTimeMillis();
         
@@ -108,13 +108,13 @@ public class ResumableOssStorageService {
             // 删除临时文件
             tempFile.delete();
             
-            Document document = new Document();
+            DocumentEntity document = new DocumentEntity();
             document.setName(UUID.randomUUID().toString());
             document.setOriginalName(originalFilename);
             document.setContentType(file.getContentType());
             document.setSize(fileLength);
-            document.setStoragePath(objectName);
-            document.setBucket(bucketName);
+            // document.setStoragePath(...);
+            // document.setBucket(...);
             document.setObjectName(objectName);
             
             uploadMetrics.recordUploadSuccess();

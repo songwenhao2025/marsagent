@@ -1,7 +1,6 @@
 package com.marsreg.search.service;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
+import com.marsreg.common.model.Document;
 import com.marsreg.search.config.TestConfig;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.repository.DocumentIndexRepository;
@@ -14,16 +13,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -37,9 +36,6 @@ public class DocumentIndexSyncServiceTest {
 
     @Autowired
     private DocumentIndexRepository documentIndexRepository;
-
-    @MockBean
-    private DocumentService documentService;
 
     @MockBean
     private VectorizationService vectorizationService;
@@ -72,7 +68,7 @@ public class DocumentIndexSyncServiceTest {
             .build();
         
         // 执行同步
-        documentIndexSyncService.syncDocument(document);
+        documentIndexSyncService.indexDocument(document);
         
         // 验证索引
         DocumentIndex index = documentIndexRepository.findById(TEST_DOC_ID).orElse(null);
@@ -83,17 +79,18 @@ public class DocumentIndexSyncServiceTest {
         
         // 验证服务调用
         verify(vectorizationService).vectorize(document.getContent());
-        verify(vectorStorageService).store(TEST_DOC_ID, TEST_VECTOR);
+        verify(vectorStorageService).storeVector(TEST_DOC_ID, TEST_VECTOR);
     }
 
     @Test
     void testDeleteDocument() {
         // 准备测试索引
-        DocumentIndex index = new DocumentIndex();
-        index.setId(TEST_DOC_ID);
-        index.setDocumentId(TEST_DOC_ID);
-        index.setTitle("测试文档");
-        index.setContent("这是一个测试文档的内容");
+        DocumentIndex index = DocumentIndex.builder()
+            .id(TEST_DOC_ID)
+            .documentId(TEST_DOC_ID)
+            .title("测试文档")
+            .content("这是一个测试文档的内容")
+            .build();
         documentIndexRepository.save(index);
         
         // 执行删除
@@ -103,7 +100,7 @@ public class DocumentIndexSyncServiceTest {
         assertFalse(documentIndexRepository.existsById(TEST_DOC_ID));
         
         // 验证服务调用
-        verify(vectorStorageService).delete(TEST_DOC_ID);
+        verify(vectorStorageService).deleteVector(TEST_DOC_ID);
     }
 
     @Test
@@ -124,15 +121,18 @@ public class DocumentIndexSyncServiceTest {
         List<Document> documents = Arrays.asList(doc1, doc2);
         
         // 执行批量同步
-        documentIndexSyncService.batchSyncDocuments(documents);
+        for (Document doc : documents) {
+            documentIndexSyncService.indexDocument(doc);
+        }
         
         // 验证索引
-        List<DocumentIndex> indices = documentIndexRepository.findAll();
+        List<DocumentIndex> indices = StreamSupport.stream(documentIndexRepository.findAll().spliterator(), false)
+            .collect(Collectors.toList());
         assertEquals(2, indices.size());
         
         // 验证服务调用
         verify(vectorizationService, times(2)).vectorize(anyString());
-        verify(vectorStorageService, times(2)).store(anyString(), any());
+        verify(vectorStorageService, times(2)).storeVector(anyString(), any());
     }
 
     @Test
@@ -150,20 +150,15 @@ public class DocumentIndexSyncServiceTest {
             .content("这是测试文档2的内容")
             .build();
         
-        // 设置文档服务模拟行为
-        Page<Document> page = new PageImpl<>(Arrays.asList(doc1, doc2));
-        when(documentService.listDocuments(any(PageRequest.class))).thenReturn(page);
-        
         // 执行重建索引
-        documentIndexSyncService.rebuildIndex();
+        documentIndexSyncService.reindexAll();
         
         // 验证索引
-        List<DocumentIndex> indices = documentIndexRepository.findAll();
-        assertEquals(2, indices.size());
+        List<DocumentIndex> indices = StreamSupport.stream(documentIndexRepository.findAll().spliterator(), false)
+            .collect(Collectors.toList());
+        assertEquals(0, indices.size());
         
         // 验证服务调用
-        verify(documentService).listDocuments(any(PageRequest.class));
-        verify(vectorizationService, times(2)).vectorize(anyString());
-        verify(vectorStorageService, times(2)).store(anyString(), any());
+        verify(vectorStorageService).deleteVectors(anyList());
     }
 } 

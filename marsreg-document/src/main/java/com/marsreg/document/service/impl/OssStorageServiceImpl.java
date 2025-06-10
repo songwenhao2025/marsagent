@@ -1,17 +1,13 @@
 package com.marsreg.document.service.impl;
 
 import com.aliyun.oss.OSS;
-import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectRequest;
-import com.marsreg.document.annotation.RateLimit;
-import com.marsreg.document.entity.Document;
-import com.marsreg.document.metrics.UploadMetrics;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.service.DocumentStorageService;
-import com.marsreg.document.upload.DefaultUploadProgressListener;
-import com.marsreg.document.upload.UploadProgressListener;
-import com.marsreg.document.util.ImageCompressor;
 import com.marsreg.document.validation.FileValidator;
+import com.marsreg.document.metrics.UploadMetrics;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -27,90 +23,61 @@ import java.util.UUID;
 @Service
 public class OssStorageServiceImpl implements DocumentStorageService {
 
-    private final OSS ossClient;
+    @Autowired
+    private OSS ossClient;
+
     private final FileValidator fileValidator;
     private final UploadMetrics uploadMetrics;
-    
-    @Value("${aliyun.oss.bucketName}")
+
+    @Value("${aliyun.oss.bucket-name}")
     private String bucketName;
-    
+
     @Value("${aliyun.oss.urlExpiration}")
     private int urlExpiration;
-    
-    public OssStorageServiceImpl(OSS ossClient, FileValidator fileValidator, UploadMetrics uploadMetrics) {
-        this.ossClient = ossClient;
+
+    @Value("${aliyun.oss.endpoint}")
+    private String endpoint;
+
+    public OssStorageServiceImpl(FileValidator fileValidator, UploadMetrics uploadMetrics) {
         this.fileValidator = fileValidator;
         this.uploadMetrics = uploadMetrics;
     }
 
     @Override
-    @RateLimit(limit = 5)  // 每分钟最多5次上传
     @Retryable(
         value = {Exception.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public Document upload(MultipartFile file) {
-        uploadMetrics.recordUploadAttempt();
-        long startTime = System.currentTimeMillis();
-        
+    public DocumentEntity upload(MultipartFile file) throws IOException {
         try {
+            // 验证文件
             fileValidator.validate(file);
-            
-            String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String objectName = UUID.randomUUID().toString() + extension;
-            
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentType(file.getContentType());
-            
-            // 如果是图片，进行压缩
-            InputStream inputStream;
-            if (file.getContentType() != null && file.getContentType().startsWith("image/")) {
-                inputStream = ImageCompressor.compress(file);
-                metadata.setContentLength(inputStream.available());
-            } else {
-                inputStream = file.getInputStream();
-                metadata.setContentLength(file.getSize());
-            }
-            
-            // 创建进度监听器
-            UploadProgressListener progressListener = new DefaultUploadProgressListener(originalFilename);
-            
-            try (inputStream) {
-                PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, objectName, inputStream, metadata);
-                putObjectRequest.setProgressListener(new com.aliyun.oss.event.ProgressListener() {
-                    @Override
-                    public void progressChanged(com.aliyun.oss.event.ProgressEvent progressEvent) {
-                        if (progressEvent.getEventType() == com.aliyun.oss.event.ProgressEventType.TRANSFER_STARTED_EVENT) {
-                            progressListener.onProgress(0, file.getSize());
-                        } else if (progressEvent.getEventType() == com.aliyun.oss.event.ProgressEventType.TRANSFER_COMPLETED_EVENT) {
-                            progressListener.onProgress(file.getSize(), file.getSize());
-                        } else if (progressEvent.getEventType() == com.aliyun.oss.event.ProgressEventType.TRANSFER_FAILED_EVENT) {
-                            progressListener.onProgress(0, file.getSize());
-                        }
-                    }
-                });
-                
-                ossClient.putObject(putObjectRequest);
-                progressListener.onSuccess();
-            }
-            
-            Document document = new Document();
-            document.setName(UUID.randomUUID().toString());
-            document.setOriginalName(originalFilename);
+
+            // 生成文件名
+            String objectName = generateObjectName(file);
+
+            // 上传文件
+            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, objectName, file.getInputStream());
+            ossClient.putObject(putObjectRequest);
+
+            // 创建文档实体
+            DocumentEntity document = new DocumentEntity();
+            document.setName(file.getOriginalFilename());
+            document.setOriginalName(file.getOriginalFilename());
             document.setContentType(file.getContentType());
-            document.setSize(metadata.getContentLength());
-            document.setStoragePath(objectName);
-            document.setBucket(bucketName);
+            document.setSize(file.getSize());
             document.setObjectName(objectName);
-            
+            document.setStoragePath(endpoint + "/" + bucketName + "/" + objectName);
+            document.setBucket(bucketName);
+
+            // 记录上传指标
             uploadMetrics.recordUploadSuccess();
-            uploadMetrics.recordUploadTime(System.currentTimeMillis() - startTime);
-            uploadMetrics.recordUploadSize(metadata.getContentLength());
-            
+            uploadMetrics.recordUploadSize(file.getSize());
+            uploadMetrics.recordFileType(file.getContentType());
+
             return document;
-        } catch (IOException e) {
+        } catch (Exception e) {
             uploadMetrics.recordUploadFailure();
             log.error("文件上传失败", e);
             throw new RuntimeException("文件上传失败", e);
@@ -118,90 +85,167 @@ public class OssStorageServiceImpl implements DocumentStorageService {
     }
 
     @Override
-    public InputStream getDocument(Document document) {
+    public InputStream getDocument(DocumentEntity document) {
         try {
             return ossClient.getObject(bucketName, document.getObjectName()).getObjectContent();
         } catch (Exception e) {
-            log.error("获取文件失败: {}", document.getObjectName(), e);
-            throw new RuntimeException("获取文件失败", e);
+            log.error("获取文档失败", e);
+            throw new RuntimeException("获取文档失败", e);
         }
     }
 
     @Override
-    public void delete(Document document) {
+    public void deleteDocument(DocumentEntity document) {
         try {
             ossClient.deleteObject(bucketName, document.getObjectName());
         } catch (Exception e) {
-            log.error("删除文件失败: {}", document.getObjectName(), e);
-            throw new RuntimeException("删除文件失败", e);
+            log.error("删除文档失败", e);
+            throw new RuntimeException("删除文档失败", e);
         }
     }
 
     @Override
-    public String getDocumentUrl(Document document, int expirySeconds) {
+    public String getDocumentUrl(DocumentEntity document) {
         try {
-            Date expiration = new Date(System.currentTimeMillis() + expirySeconds * 1000L);
+            Date expiration = new Date(System.currentTimeMillis() + urlExpiration * 1000L);
             return ossClient.generatePresignedUrl(bucketName, document.getObjectName(), expiration).toString();
         } catch (Exception e) {
-            log.error("获取文件URL失败: {}", document.getObjectName(), e);
-            throw new RuntimeException("获取文件URL失败", e);
+            log.error("生成文档URL失败", e);
+            throw new RuntimeException("生成文档URL失败", e);
         }
     }
 
     @Override
-    public void storeFile(MultipartFile file, String objectName) {
-        fileValidator.validate(file);
-        
+    public DocumentEntity saveDocument(MultipartFile file) throws IOException {
+        return upload(file);
+    }
+
+    @Override
+    public void deleteDocument(String objectName) {
         try {
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentType(file.getContentType());
-            
-            // 如果是图片，进行压缩
-            InputStream inputStream;
-            if (file.getContentType() != null && file.getContentType().startsWith("image/")) {
-                inputStream = ImageCompressor.compress(file);
-                metadata.setContentLength(inputStream.available());
-            } else {
-                inputStream = file.getInputStream();
-                metadata.setContentLength(file.getSize());
-            }
-            
-            try (inputStream) {
-                PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, objectName, inputStream, metadata);
-                ossClient.putObject(putObjectRequest);
-            }
-            
-            log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
+            ossClient.deleteObject(bucketName, objectName);
         } catch (Exception e) {
-            log.error("文件上传失败", e);
-            throw new RuntimeException("文件上传失败", e);
+            log.error("删除文档失败", e);
+            throw new RuntimeException("删除文档失败", e);
         }
     }
 
     @Override
-    public void deleteFile(String bucket, String objectName) {
+    public String getDocumentUrl(String objectName) {
         try {
-            ossClient.deleteObject(bucket, objectName);
-            log.info("文件删除成功: bucket={}, object={}", bucket, objectName);
+            Date expiration = new Date(System.currentTimeMillis() + urlExpiration * 1000L);
+            return ossClient.generatePresignedUrl(bucketName, objectName, expiration).toString();
         } catch (Exception e) {
-            log.error("文件删除失败", e);
-            throw new RuntimeException("文件删除失败", e);
-        }
-    }
-
-    @Override
-    public String getFileUrl(String bucket, String objectName, int expirySeconds) {
-        try {
-            Date expiration = new Date(System.currentTimeMillis() + expirySeconds * 1000L);
-            return ossClient.generatePresignedUrl(bucket, objectName, expiration).toString();
-        } catch (Exception e) {
-            log.error("获取文件URL失败", e);
-            throw new RuntimeException("获取文件URL失败", e);
+            log.error("生成文档URL失败", e);
+            throw new RuntimeException("生成文档URL失败", e);
         }
     }
 
     @Override
     public String getBucketName() {
         return bucketName;
+    }
+
+    @Override
+    public void deleteFile(String objectName) {
+        try {
+            ossClient.deleteObject(bucketName, objectName);
+        } catch (Exception e) {
+            log.error("删除文件失败", e);
+            throw new RuntimeException("删除文件失败", e);
+        }
+    }
+
+    @Override
+    public String getFileUrl(String bucketName, String objectName, int expiration) {
+        try {
+            Date expirationDate = new Date(System.currentTimeMillis() + expiration * 1000L);
+            return ossClient.generatePresignedUrl(bucketName, objectName, expirationDate).toString();
+        } catch (Exception e) {
+            log.error("生成文件URL失败", e);
+            throw new RuntimeException("生成文件URL失败", e);
+        }
+    }
+
+    @Override
+    public DocumentEntity storeFile(MultipartFile file, String objectName) throws IOException {
+        try {
+            // 验证文件
+            fileValidator.validate(file);
+
+            // 上传文件
+            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, objectName, file.getInputStream());
+            ossClient.putObject(putObjectRequest);
+
+            // 创建文档实体
+            DocumentEntity document = new DocumentEntity();
+            document.setName(file.getOriginalFilename());
+            document.setOriginalName(file.getOriginalFilename());
+            document.setContentType(file.getContentType());
+            document.setSize(file.getSize());
+            document.setObjectName(objectName);
+            document.setStoragePath(endpoint + "/" + bucketName + "/" + objectName);
+            document.setBucket(bucketName);
+
+            // 记录上传指标
+            uploadMetrics.recordUploadSuccess();
+            uploadMetrics.recordUploadSize(file.getSize());
+            uploadMetrics.recordFileType(file.getContentType());
+
+            return document;
+        } catch (Exception e) {
+            uploadMetrics.recordUploadFailure();
+            log.error("文件上传失败", e);
+            throw new RuntimeException("文件上传失败", e);
+        }
+    }
+
+    @Override
+    public void saveDocument(DocumentEntity document, InputStream inputStream) {
+        try {
+            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, document.getObjectName(), inputStream);
+            ossClient.putObject(putObjectRequest);
+            uploadMetrics.recordUploadSuccess();
+        } catch (Exception e) {
+            uploadMetrics.recordUploadFailure();
+            log.error("保存文档失败", e);
+            throw new RuntimeException("保存文档失败", e);
+        }
+    }
+
+    @Override
+    public String getBucket() {
+        return bucketName;
+    }
+
+    @Override
+    public String getStoragePath() {
+        return endpoint + "/" + bucketName;
+    }
+
+    @Override
+    public String storeFile(MultipartFile file) {
+        try {
+            return generateObjectName(file);
+        } catch (Exception e) {
+            log.error("生成文件名失败", e);
+            throw new RuntimeException("生成文件名失败", e);
+        }
+    }
+
+    @Override
+    public void deleteFile(String bucketName, String objectName) {
+        try {
+            ossClient.deleteObject(bucketName, objectName);
+        } catch (Exception e) {
+            log.error("删除文件失败", e);
+            throw new RuntimeException("删除文件失败", e);
+        }
+    }
+
+    private String generateObjectName(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        return UUID.randomUUID().toString() + extension;
     }
 } 

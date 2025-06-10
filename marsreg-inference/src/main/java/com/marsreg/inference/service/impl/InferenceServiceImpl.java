@@ -11,7 +11,6 @@ import com.marsreg.inference.service.LLMService;
 import com.marsreg.inference.service.MetricsService;
 import com.marsreg.inference.service.ModelManagementService;
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
 import com.marsreg.search.service.SearchService;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +26,8 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.concurrent.TimeUnit;
+import com.marsreg.search.model.SearchResponse;
+import com.marsreg.search.model.SearchResult;
 
 @Slf4j
 @Service
@@ -85,17 +86,17 @@ public class InferenceServiceImpl implements InferenceService {
             ModelInfo activeModel = modelManagementService.getActiveModel();
             if (activeModel == null) {
                 throw new InferenceException(
-                    ErrorCode.MODEL_NOT_FOUND.getCode(),
+                    String.valueOf(ErrorCode.MODEL_NOT_FOUND.getCode()),
                     "未找到活跃模型"
                 );
             }
             
             // 1. 执行文档检索
-            List<SearchResult> searchResults = searchService.search(buildSearchRequest(request));
+            List<SearchResponse.SearchResult> searchResults = searchService.search(buildSearchRequest(request)).getResults();
             if (searchResults.isEmpty()) {
                 metricsService.recordError();
                 throw new InferenceException(
-                    ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode(),
+                    String.valueOf(ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode()),
                     "未找到相关文档"
                 );
             }
@@ -105,7 +106,7 @@ public class InferenceServiceImpl implements InferenceService {
             if (context.isEmpty()) {
                 metricsService.recordError();
                 throw new InferenceException(
-                    ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode(),
+                    String.valueOf(ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode()),
                     "上下文提取失败"
                 );
             }
@@ -123,7 +124,7 @@ public class InferenceServiceImpl implements InferenceService {
             if (StringUtils.isEmpty(answer)) {
                 metricsService.recordError();
                 throw new InferenceException(
-                    ErrorCode.MODEL_INFERENCE_FAILED.getCode(),
+                    String.valueOf(ErrorCode.MODEL_INFERENCE_FAILED.getCode()),
                     "模型生成回答失败"
                 );
             }
@@ -145,7 +146,7 @@ public class InferenceServiceImpl implements InferenceService {
                 throw (InferenceException) e;
             }
             throw new InferenceException(
-                ErrorCode.INTERNAL_ERROR.getCode(),
+                String.valueOf(ErrorCode.INTERNAL_ERROR.getCode()),
                 "推理过程发生错误: " + e.getMessage(),
                 e
             );
@@ -166,17 +167,17 @@ public class InferenceServiceImpl implements InferenceService {
             ModelInfo activeModel = modelManagementService.getActiveModel();
             if (activeModel == null) {
                 throw new InferenceException(
-                    ErrorCode.MODEL_NOT_FOUND.getCode(),
+                    String.valueOf(ErrorCode.MODEL_NOT_FOUND.getCode()),
                     "未找到活跃模型"
                 );
             }
             
             // 1. 执行文档检索
-            List<SearchResult> searchResults = searchService.search(buildSearchRequest(request));
+            List<SearchResponse.SearchResult> searchResults= searchService.search(buildSearchRequest(request)).getResults();
             if (searchResults.isEmpty()) {
                 metricsService.recordError();
                 callback.onError(new InferenceException(
-                    ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode(),
+                    String.valueOf(ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode()),
                     "未找到相关文档"
                 ));
                 return;
@@ -187,7 +188,7 @@ public class InferenceServiceImpl implements InferenceService {
             if (context.isEmpty()) {
                 metricsService.recordError();
                 callback.onError(new InferenceException(
-                    ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode(),
+                    String.valueOf(ErrorCode.CONTEXT_EXTRACTION_FAILED.getCode()),
                     "上下文提取失败"
                 ));
                 return;
@@ -220,7 +221,7 @@ public class InferenceServiceImpl implements InferenceService {
                     public void onError(Throwable error) {
                         metricsService.recordError();
                         callback.onError(new InferenceException(
-                            ErrorCode.STREAM_PROCESSING_FAILED.getCode(),
+                            String.valueOf(ErrorCode.STREAM_PROCESSING_FAILED.getCode()),
                             "流式推理处理失败: " + error.getMessage(),
                             error
                         ));
@@ -231,7 +232,7 @@ public class InferenceServiceImpl implements InferenceService {
             log.error("流式推理过程发生错误", e);
             metricsService.recordError();
             callback.onError(new InferenceException(
-                ErrorCode.STREAM_INITIALIZATION_FAILED.getCode(),
+                String.valueOf(ErrorCode.STREAM_INITIALIZATION_FAILED.getCode()),
                 "流式推理初始化失败: " + e.getMessage(),
                 e
             ));
@@ -240,12 +241,12 @@ public class InferenceServiceImpl implements InferenceService {
         }
     }
 
-    private void updateModelMetrics(ModelInfo model, List<SearchResult> searchResults, String answer) {
+    private void updateModelMetrics(ModelInfo model, List< SearchResponse.SearchResult> searchResults, String answer) {
         Map<String, Object> metrics = new HashMap<>();
         metrics.put("lastUsedTime", LocalDateTime.now());
         metrics.put("documentCount", searchResults.size());
         metrics.put("averageRelevance", searchResults.stream()
-            .mapToDouble(SearchResult::getScore)
+            .mapToDouble( SearchResponse.SearchResult::getScore)
             .average()
             .orElse(0.0));
         if (answer != null) {
@@ -255,12 +256,12 @@ public class InferenceServiceImpl implements InferenceService {
         modelManagementService.updateModelMetrics(model.getId(), metrics);
     }
 
-    private Map<String, Object> buildMetadata(InferenceRequest request, List<SearchResult> searchResults, ModelInfo model) {
+    private Map<String, Object> buildMetadata(InferenceRequest request, List<SearchResponse.SearchResult> searchResults, ModelInfo model) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("searchType", request.getSearchType());
         metadata.put("documentCount", searchResults.size());
         metadata.put("averageRelevance", searchResults.stream()
-            .mapToDouble(SearchResult::getScore)
+            .mapToDouble(SearchResponse.SearchResult::getScore)
             .average()
             .orElse(0.0));
         metadata.put("modelId", model.getId());
@@ -272,21 +273,21 @@ public class InferenceServiceImpl implements InferenceService {
     private void validateRequest(InferenceRequest request) {
         if (request == null) {
             throw new InferenceException(
-                ErrorCode.INVALID_REQUEST.getCode(),
+                String.valueOf(ErrorCode.INVALID_REQUEST.getCode()),
                 "请求不能为空"
             );
         }
         
         if (StringUtils.isEmpty(request.getQuestion())) {
             throw new InferenceException(
-                ErrorCode.INVALID_REQUEST.getCode(),
+                String.valueOf(ErrorCode.INVALID_REQUEST.getCode()),
                 "问题不能为空"
             );
         }
         
         if (request.getSearchType() == null) {
             throw new InferenceException(
-                ErrorCode.INVALID_REQUEST.getCode(),
+                String.valueOf(ErrorCode.INVALID_REQUEST.getCode()),
                 "搜索类型不能为空"
             );
         }
@@ -294,7 +295,7 @@ public class InferenceServiceImpl implements InferenceService {
         if (request.getMaxDocuments() != null && 
             request.getMaxDocuments() > properties.getContext().getMaxDocuments()) {
             throw new InferenceException(
-                ErrorCode.CONTEXT_TOO_LARGE.getCode(),
+                String.valueOf(ErrorCode.CONTEXT_TOO_LARGE.getCode()),
                 "请求的文档数量超过最大限制: " + properties.getContext().getMaxDocuments()
             );
         }
@@ -303,33 +304,39 @@ public class InferenceServiceImpl implements InferenceService {
     private SearchRequest buildSearchRequest(InferenceRequest request) {
         return SearchRequest.builder()
             .query(request.getQuestion())
-            .searchType(request.getSearchType())
+            .searchType(SearchRequest.SearchType.valueOf(request.getSearchType().name()))
             .size(request.getMaxDocuments() != null ? 
                 request.getMaxDocuments() : 
                 properties.getContext().getMaxDocuments())
-            .minSimilarity(request.getMinSimilarity() != null ? 
+            .minScore(request.getMinSimilarity() != null ? 
                 request.getMinSimilarity() : 
                 properties.getContext().getMinSimilarity())
             .documentTypes(request.getDocumentTypes())
             .build();
     }
 
-    private List<String> extractContext(List<SearchResult> searchResults) {
+    private List<String> extractContext(List<SearchResponse.SearchResult> searchResults) {
         return searchResults.stream()
             .map(result -> String.format("标题：%s\n内容：%s", 
                 result.getTitle(), result.getContent()))
             .collect(Collectors.toList());
     }
 
-    private List<InferenceResponse.DocumentReference> buildReferences(List<SearchResult> searchResults) {
-        return searchResults.stream()
-            .map(result -> InferenceResponse.DocumentReference.builder()
-                .documentId(result.getDocumentId())
-                .title(result.getTitle())
-                .content(result.getContent())
-                .relevance(result.getScore())
-                .metadata(result.getMetadata())
-                .build())
+    private List<InferenceResponse.DocumentReference> buildReferences(List< SearchResponse.SearchResult> searchResults) {
+        return  searchResults.stream()
+        .<InferenceResponse.DocumentReference>map(result -> {                
+            Map<String, Object> metadata = new HashMap<>();
+                if (result.getMetadata() != null) {
+                    metadata.put("raw", result.getMetadata());
+                }
+                return InferenceResponse.DocumentReference.builder()
+                    .documentId(result.getId())                    
+                    .title(result.getTitle())
+                    .content(result.getContent())
+                    .relevance(result.getScore())
+                    .metadata(metadata)
+                    .build();
+            })
             .collect(Collectors.toList());
     }
 } 

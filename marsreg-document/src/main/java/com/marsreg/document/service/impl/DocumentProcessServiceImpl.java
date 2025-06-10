@@ -3,7 +3,7 @@ package com.marsreg.document.service.impl;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.document.config.CacheConfig;
 import com.marsreg.document.config.ChunkingConfig;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentChunk;
 import com.marsreg.document.entity.DocumentChunkMetadata;
 import com.marsreg.document.enums.DocumentStatus;
@@ -11,6 +11,7 @@ import com.marsreg.document.repository.DocumentChunkRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentIndexService;
 import com.marsreg.document.service.DocumentProcessService;
+import com.marsreg.document.service.DocumentService;
 import com.marsreg.document.service.DocumentStorageService;
 import com.marsreg.document.service.DocumentVectorService;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +24,17 @@ import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.sax.BodyContentHandler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.xml.sax.SAXException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -50,6 +54,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     private final DocumentChunkMetadataService metadataService;
     private final DocumentVectorService documentVectorService;
     private final ChunkingConfig chunkingConfig;
+    private final DocumentService documentService;
     private final Tika tika = new Tika();
 
     // 语言代码映射
@@ -66,45 +71,54 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     }
 
     @Override
-    public Document process(Document document) {
+    @Transactional
+    public DocumentEntity process(DocumentEntity document) {
         try {
-            // 更新状态为处理中
             document.setStatus(DocumentStatus.PROCESSING);
-            
+            documentService.save(document);
+
             // 提取文本
             String text = extractText(document);
-            
-            // 清洗文本
-            String cleanedText = cleanText(text);
-            
-            // 更新状态为完成
-            document.setStatus(DocumentStatus.ACTIVE);
-            
+            document.setContent(text);
+
+            // 生成向量
+            documentVectorService.generateVector(document);
+
+            document.setStatus(DocumentStatus.COMPLETED);
+            documentService.save(document);
             return document;
         } catch (Exception e) {
-            log.error("文档处理失败", e);
             document.setStatus(DocumentStatus.FAILED);
-            document.setErrorMessage(e.getMessage());
-            throw new BusinessException("文档处理失败: " + e.getMessage());
+            documentService.save(document);
+            throw new RuntimeException("Failed to process document", e);
         }
     }
 
     @Override
-    public String extractText(Document document) {
-        try (InputStream inputStream = documentStorageService.getDocument(document)) {
-            // 使用Tika提取文本
-            Metadata metadata = new Metadata();
-            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, document.getOriginalName());
-            
-            BodyContentHandler handler = new BodyContentHandler(-1);
-            Parser parser = new AutoDetectParser();
-            ParseContext context = new ParseContext();
-            
-            parser.parse(inputStream, handler, metadata, context);
-            
-            return handler.toString();
-        } catch (IOException | SAXException | TikaException e) {
-            throw new BusinessException("文本提取失败", e);
+    public void processBatch(List<DocumentEntity> documents) {
+        for (DocumentEntity document : documents) {
+            process(document);
+        }
+    }
+
+    @Override
+    public String processDocument(DocumentEntity document) {
+        return extractText(document);
+    }
+
+    @Override
+    public String extractText(DocumentEntity document) {
+        try {
+            var inputStream = documentStorageService.getDocument(document);
+            var reader = new BufferedReader(new InputStreamReader(inputStream));
+            var text = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                text.append(line).append("\n");
+            }
+            return text.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract text from document", e);
         }
     }
 
@@ -235,8 +249,18 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
 
         while (start < textLength) {
             int end = Math.min(start + actualChunkSize, textLength);
-            String chunk = text.substring(start, end);
-            chunks.add(chunk);
+            
+            // 如果不是最后一个分块，尝试在句子边界处分割
+            if (end < textLength) {
+                end = findSentenceBoundary(text, start, end);
+            }
+            
+            String chunk = text.substring(start, end).trim();
+            if (!chunk.isEmpty()) {
+                chunks.add(chunk);
+            }
+            
+            // 计算下一个分块的起始位置，考虑重叠
             start = end - actualOverlapSize;
             chunkIndex++;
         }
@@ -247,141 +271,95 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     @Override
     @Transactional
     public List<String> smartChunkText(String text, int maxChunkSize, int minChunkSize) {
-        if (text == null || text.isEmpty()) {
+        if (text == null || text.isEmpty() || maxChunkSize <= 0 || minChunkSize <= 0) {
             return List.of();
         }
 
-        // 使用配置的默认值
-        int actualMaxChunkSize = maxChunkSize > 0 ? maxChunkSize : chunkingConfig.getDefaultMaxChunkSize();
-        int actualMinChunkSize = minChunkSize > 0 ? minChunkSize : chunkingConfig.getDefaultMinChunkSize();
-
-        // 如果禁用智能分块，使用基本分块
-        if (!chunkingConfig.isEnableSmartChunking()) {
-            return chunkText(text, actualMaxChunkSize, chunkingConfig.getDefaultOverlapSize());
-        }
-
         List<String> chunks = new ArrayList<>();
-        String[] paragraphs = text.split("\n\\s*\n");
-        StringBuilder currentChunk = new StringBuilder();
-        int chunkIndex = 0;
+        int start = 0;
+        int textLength = text.length();
 
-        for (String paragraph : paragraphs) {
-            // 如果当前段落加上现有块超过最大大小，且现有块不为空
-            if (currentChunk.length() + paragraph.length() > actualMaxChunkSize && currentChunk.length() > 0) {
-                // 如果现有块大于最小大小，直接添加
-                if (currentChunk.length() >= actualMinChunkSize) {
-                    chunks.add(currentChunk.toString().trim());
-                    currentChunk = new StringBuilder();
-                    chunkIndex++;
-                } else if (chunkingConfig.isSplitOnSentenceBoundary()) {
-                    // 否则，尝试在句子边界分割
-                    String[] sentences = currentChunk.toString().split("[.!?。！？]");
-                    StringBuilder tempChunk = new StringBuilder();
-                    
-                    for (String sentence : sentences) {
-                        if (tempChunk.length() + sentence.length() > actualMaxChunkSize) {
-                            if (tempChunk.length() >= actualMinChunkSize) {
-                                chunks.add(tempChunk.toString().trim());
-                                tempChunk = new StringBuilder();
-                                chunkIndex++;
-                            }
-                        }
-                        tempChunk.append(sentence).append(".");
-                    }
-                    
-                    if (tempChunk.length() > 0) {
-                        currentChunk = tempChunk;
-                    } else {
-                        currentChunk = new StringBuilder();
-                    }
-                }
+        while (start < textLength) {
+            int end = Math.min(start + maxChunkSize, textLength);
+            
+            // 如果不是最后一个分块，尝试在段落边界处分割
+            if (end < textLength) {
+                end = findParagraphBoundary(text, start, end);
             }
             
-            // 添加当前段落
-            if (currentChunk.length() > 0) {
-                currentChunk.append("\n\n");
+            String chunk = text.substring(start, end).trim();
+            if (!chunk.isEmpty() && chunk.length() >= minChunkSize) {
+                chunks.add(chunk);
             }
-            currentChunk.append(paragraph);
-        }
-
-        // 添加最后一个块
-        if (currentChunk.length() > 0) {
-            chunks.add(currentChunk.toString().trim());
+            
+            start = end;
         }
 
         return chunks;
     }
 
-    /**
-     * 保存文档分块
-     * @param documentId 文档ID
-     * @param chunks 分块列表
-     * @param language 语言
-     */
+    private int findSentenceBoundary(String text, int start, int end) {
+        // 在最大分块大小范围内查找句子边界
+        int boundary = end;
+        for (int i = end - 1; i >= start; i--) {
+            char c = text.charAt(i);
+            if (c == '.' || c == '!' || c == '?' || c == '。' || c == '！' || c == '？') {
+                boundary = i + 1;
+                break;
+            }
+        }
+        return boundary;
+    }
+
+    private int findParagraphBoundary(String text, int start, int end) {
+        // 在最大分块大小范围内查找段落边界
+        int boundary = end;
+        for (int i = end - 1; i >= start; i--) {
+            if (text.charAt(i) == '\n' && (i == 0 || text.charAt(i - 1) == '\n')) {
+                boundary = i;
+                break;
+            }
+        }
+        return boundary;
+    }
+
+    @Override
     @Transactional
     public void saveChunks(Long documentId, List<String> chunks, String language) {
-        // 删除旧的分块
+        DocumentEntity document = documentService.getDocumentEntity(documentId)
+            .orElseThrow(() -> new BusinessException("文档不存在"));
+
+        // 删除现有的分块
         documentChunkRepository.deleteByDocumentId(documentId);
-        metadataService.deleteByDocumentId(documentId);
 
         // 保存新的分块
-        List<DocumentChunk> savedChunks = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
-            String chunk = chunks.get(i);
-            DocumentChunk documentChunk = new DocumentChunk();
-            documentChunk.setDocumentId(documentId);
-            documentChunk.setChunkIndex(i);
-            documentChunk.setContent(chunk);
-            documentChunk.setWordCount(countWords(chunk));
-            documentChunk.setLanguage(language);
-            documentChunk = documentChunkRepository.save(documentChunk);
-            savedChunks.add(documentChunk);
+            DocumentChunk chunk = new DocumentChunk();
+            chunk.setDocument(document);
+            chunk.setContent(chunks.get(i));
+            chunk.setChunkIndex(i);
+            chunk.setLanguage(language);
+            documentChunkRepository.save(chunk);
 
             // 保存分块元数据
-            saveChunkMetadata(documentChunk);
+            saveChunkMetadata(chunk);
         }
-
-        // 更新索引
-        documentIndexService.indexDocument(new Document() {{
-            setId(documentId);
-        }}, chunks);
-
-        // 向量化并存储分块
-        Document document = new Document();
-        document.setId(documentId);
-        documentVectorService.vectorizeAndStore(document, savedChunks);
     }
 
-    /**
-     * 保存分块元数据
-     * @param chunk 文档分块
-     */
     private void saveChunkMetadata(DocumentChunk chunk) {
-        List<DocumentChunkMetadata> metadataList = new ArrayList<>();
-
-        // 添加基本元数据
-        metadataList.add(createMetadata(chunk, "word_count", String.valueOf(chunk.getWordCount()), "number", "字数统计"));
-        metadataList.add(createMetadata(chunk, "language", chunk.getLanguage(), "string", "语言"));
-        metadataList.add(createMetadata(chunk, "chunk_index", String.valueOf(chunk.getChunkIndex()), "number", "分块索引"));
-        metadataList.add(createMetadata(chunk, "created_at", chunk.getCreatedAt().toString(), "datetime", "创建时间"));
-
-        // 添加内容分析元数据
-        String content = chunk.getContent();
-        metadataList.add(createMetadata(chunk, "sentence_count", String.valueOf(countSentences(content)), "number", "句子数量"));
-        metadataList.add(createMetadata(chunk, "paragraph_count", String.valueOf(countParagraphs(content)), "number", "段落数量"));
-        metadataList.add(createMetadata(chunk, "avg_sentence_length", String.valueOf(calculateAvgSentenceLength(content)), "number", "平均句子长度"));
-
-        // 保存元数据
-        metadataService.saveAll(metadataList);
+        String text = chunk.getContent();
+        
+        // 保存基本统计信息
+        metadataService.save(createMetadata(chunk, "word_count", String.valueOf(countWords(text)), "number", "单词数"));
+        metadataService.save(createMetadata(chunk, "sentence_count", String.valueOf(countSentences(text)), "number", "句子数"));
+        metadataService.save(createMetadata(chunk, "paragraph_count", String.valueOf(countParagraphs(text)), "number", "段落数"));
+        metadataService.save(createMetadata(chunk, "avg_sentence_length", String.valueOf(calculateAvgSentenceLength(text)), "number", "平均句子长度"));
     }
 
-    /**
-     * 创建元数据
-     */
     private DocumentChunkMetadata createMetadata(DocumentChunk chunk, String key, String value, String type, String description) {
         DocumentChunkMetadata metadata = new DocumentChunkMetadata();
+        metadata.setDocumentId(chunk.getDocument().getId());
         metadata.setChunkId(chunk.getId());
-        metadata.setDocumentId(chunk.getDocumentId());
         metadata.setKey(key);
         metadata.setValue(value);
         metadata.setType(type);
@@ -389,80 +367,43 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         return metadata;
     }
 
-    /**
-     * 计算平均句子长度
-     */
     private double calculateAvgSentenceLength(String text) {
-        String[] sentences = text.split("[.!?。！？]");
-        if (sentences.length == 0) {
-            return 0;
-        }
-        int totalLength = 0;
-        for (String sentence : sentences) {
-            totalLength += sentence.trim().length();
-        }
-        return (double) totalLength / sentences.length;
+        int words = countWords(text);
+        int sentences = countSentences(text);
+        return sentences > 0 ? (double) words / sentences : 0;
     }
 
-    /**
-     * 获取文档分块
-     * @param documentId 文档ID
-     * @return 分块列表
-     */
+    @Override
     @Cacheable(value = CacheConfig.DOCUMENT_CHUNKS_CACHE, key = "#documentId")
     public List<String> getChunks(Long documentId) {
-        List<DocumentChunk> chunks = documentChunkRepository.findByDocumentIdOrderByChunkIndexAsc(documentId);
-        return chunks.stream()
-                .map(DocumentChunk::getContent)
-                .collect(Collectors.toList());
+        return documentChunkRepository.findByDocumentIdOrderByChunkIndex(documentId)
+            .stream()
+            .map(DocumentChunk::getContent)
+            .collect(Collectors.toList());
     }
 
-    /**
-     * 清除文档分块缓存
-     * @param documentId 文档ID
-     */
+    @Override
     @CacheEvict(value = CacheConfig.DOCUMENT_CHUNKS_CACHE, key = "#documentId")
     public void clearChunksCache(Long documentId) {
-        log.debug("清除文档分块缓存: {}", documentId);
+        // 缓存清除由注解处理
     }
 
-    /**
-     * 清除文档的缓存
-     * @param documentId 文档ID
-     */
+    @Override
     @CacheEvict(value = {CacheConfig.DOCUMENT_CHUNKS_CACHE, CacheConfig.DOCUMENT_CONTENT_CACHE}, allEntries = true)
     public void clearDocumentCache(Long documentId) {
-        log.debug("清除文档缓存: {}", documentId);
+        // 缓存清除由注解处理
     }
 
-    /**
-     * 计算文本中的单词数
-     */
     private int countWords(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
         return text.split("\\s+").length;
     }
 
-    /**
-     * 计算文本中的句子数
-     */
     private int countSentences(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
         return text.split("[.!?。！？]").length;
     }
 
-    /**
-     * 计算文本中的段落数
-     */
     private int countParagraphs(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
-        return text.split("\n\\s*\n").length;
+        return text.split("\\n\\s*\\n").length;
     }
 
     @Override
@@ -472,20 +413,27 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
             metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName);
             
             BodyContentHandler handler = new BodyContentHandler(-1);
-            Parser parser = new AutoDetectParser();
             ParseContext context = new ParseContext();
+            Parser parser = new AutoDetectParser();
             
             parser.parse(inputStream, handler, metadata, context);
-            
             return handler.toString();
-        } catch (IOException | SAXException | TikaException e) {
-            throw new BusinessException("文本提取失败", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract text from document", e);
         }
     }
 
-    @Override
-    public String processDocument(Document document) {
-        Document processedDoc = process(document);
-        return extractText(processedDoc);
+    private List<DocumentChunk> splitIntoChunks(String text) {
+        List<String> chunks = smartChunkText(text, chunkingConfig.getDefaultMaxChunkSize(), chunkingConfig.getDefaultMinChunkSize());
+        List<DocumentChunk> documentChunks = new ArrayList<>();
+        
+        for (int i = 0; i < chunks.size(); i++) {
+            DocumentChunk chunk = new DocumentChunk();
+            chunk.setContent(chunks.get(i));
+            chunk.setChunkIndex(i);
+            documentChunks.add(chunk);
+        }
+        
+        return documentChunks;
     }
 } 

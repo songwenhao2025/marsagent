@@ -1,13 +1,11 @@
 package com.marsreg.document.metrics;
 
 import io.micrometer.core.instrument.*;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
 @Component
-@RequiredArgsConstructor
 public class UploadMetrics {
 
     private final MeterRegistry registry;

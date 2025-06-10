@@ -48,4 +48,8 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, Lo
      */
     @Query("SELECT c FROM DocumentChunk c WHERE c.documentId = :documentId AND c.content LIKE %:keyword%")
     List<DocumentChunk> searchByKeyword(@Param("documentId") Long documentId, @Param("keyword") String keyword);
+
+    List<DocumentChunk> findByDocumentId(Long documentId);
+
+    List<DocumentChunk> findByDocumentIdOrderByChunkIndex(Long documentId);
 } 

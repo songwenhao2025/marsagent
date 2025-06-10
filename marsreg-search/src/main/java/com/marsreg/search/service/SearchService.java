@@ -1,44 +1,46 @@
 package com.marsreg.search.service;
 
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
-import java.util.List;
+import com.marsreg.search.model.SearchResponse;
+import java.util.Map;
 
 public interface SearchService {
     /**
-     * 执行检索
+     * 执行搜索
      *
-     * @param request 检索请求
-     * @return 检索结果列表
+     * @param request 搜索请求
+     * @return 搜索响应
      */
-    List<SearchResult> search(SearchRequest request);
+    SearchResponse search(SearchRequest request);
 
     /**
-     * 执行向量检索
+     * 执行关键词搜索
      *
-     * @param query 查询文本
-     * @param size 返回结果数量
-     * @param minSimilarity 最小相似度阈值
-     * @return 检索结果列表
+     * @param request 搜索请求
+     * @return 搜索响应
      */
-    List<SearchResult> vectorSearch(String query, int size, float minSimilarity);
+    SearchResponse keywordSearch(SearchRequest request);
 
     /**
-     * 执行关键词检索
+     * 执行向量搜索
      *
-     * @param query 查询文本
-     * @param size 返回结果数量
-     * @return 检索结果列表
+     * @param request 搜索请求
+     * @return 搜索响应
      */
-    List<SearchResult> keywordSearch(String query, int size);
+    SearchResponse vectorSearch(SearchRequest request);
 
     /**
-     * 执行混合检索
+     * 执行混合搜索
      *
-     * @param query 查询文本
-     * @param size 返回结果数量
-     * @param minSimilarity 最小相似度阈值
-     * @return 检索结果列表
+     * @param request 搜索请求
+     * @return 搜索响应
      */
-    List<SearchResult> hybridSearch(String query, int size, float minSimilarity);
+    SearchResponse hybridSearch(SearchRequest request);
+
+    /**
+     * 获取搜索统计信息
+     *
+     * @return 搜索统计信息
+     */
+    Map<String, Object> getSearchStats();
 } 

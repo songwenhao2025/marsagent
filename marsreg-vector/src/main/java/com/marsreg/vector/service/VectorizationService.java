@@ -5,32 +5,47 @@ import java.util.Map;
 
 public interface VectorizationService {
     /**
-     * 文本向量化
+     * 将文本转换为向量
      * @param text 输入文本
-     * @return 向量
+     * @return 向量表示
      */
-    List<Float> vectorize(String text);
+    float[] vectorize(String text);
 
     /**
-     * 批量文本向量化
+     * 批量将文本转换为向量
      * @param texts 输入文本列表
-     * @return 向量列表
+     * @return 向量表示列表
      */
-    List<List<Float>> batchVectorize(List<String> texts);
+    List<float[]> batchVectorize(List<String> texts);
 
     /**
-     * 带缓存的文本向量化
+     * 使用缓存将文本转换为向量
      * @param text 输入文本
-     * @return 向量
+     * @return 向量表示
      */
-    List<Float> vectorizeWithCache(String text);
+    float[] vectorizeWithCache(String text);
 
     /**
-     * 带缓存的批量文本向量化
+     * 使用缓存批量将文本转换为向量
      * @param texts 输入文本列表
-     * @return 向量列表
+     * @return 向量表示列表
      */
-    List<List<Float>> batchVectorizeWithCache(List<String> texts);
+    List<float[]> batchVectorizeWithCache(List<String> texts);
+
+    /**
+     * 计算两个向量的余弦相似度
+     * @param vector1 第一个向量
+     * @param vector2 第二个向量
+     * @return 相似度分数
+     */
+    float calculateSimilarity(float[] vector1, float[] vector2);
+
+    /**
+     * 计算向量之间的相似度矩阵
+     * @param vectors 向量列表
+     * @return 相似度矩阵
+     */
+    List<List<Float>> calculateSimilarityMatrix(List<float[]> vectors);
 
     /**
      * 获取向量化模型信息
@@ -54,14 +69,6 @@ public interface VectorizationService {
      * @return 向量维度
      */
     int getDimension();
-
-    /**
-     * 计算向量相似度
-     * @param vector1 向量1
-     * @param vector2 向量2
-     * @return 相似度分数
-     */
-    float calculateSimilarity(float[] vector1, float[] vector2);
 
     /**
      * 向量归一化

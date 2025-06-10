@@ -1,189 +1,324 @@
 package com.marsreg.search.service.impl;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
-import com.marsreg.search.cache.SearchCacheKeyGenerator;
-import com.marsreg.search.model.DocumentIndex;
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.SearchRequest.Builder;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.search.TotalHits;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.aggregations.*;
+import co.elastic.clients.json.JsonData;
+import com.marsreg.search.exception.SearchException;
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
-import com.marsreg.search.model.SearchType;
-import com.marsreg.search.query.SearchQueryBuilder;
-import com.marsreg.search.repository.DocumentIndexRepository;
-import com.marsreg.search.service.SearchHighlightService;
+import com.marsreg.search.model.SearchResponse;
 import com.marsreg.search.service.SearchService;
 import com.marsreg.vector.service.VectorizationService;
-import com.marsreg.vector.service.VectorStorageService;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
-import org.elasticsearch.search.SearchHit;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
 
-    private final DocumentService documentService;
+    private static final float KEYWORD_WEIGHT = 0.6f;
+    private static final float VECTOR_WEIGHT = 0.4f;
+    private static final int MAX_RESULTS = 1000;
+    private static final int AGGREGATION_SIZE = 20;
+
+    private final ElasticsearchClient elasticsearchClient;
+    private final MeterRegistry meterRegistry;
     private final VectorizationService vectorizationService;
-    private final VectorStorageService vectorStorageService;
-    private final DocumentIndexRepository documentIndexRepository;
-    private final ElasticsearchOperations elasticsearchOperations;
-    private final SearchQueryBuilder searchQueryBuilder;
-    private final SearchCacheKeyGenerator cacheKeyGenerator;
-    private final SearchHighlightService searchHighlightService;
+    private final Map<String, Long> searchStats = new ConcurrentHashMap<>();
 
-    @Value("${search.vector-weight:0.7}")
-    private float vectorWeight;
-
-    @Value("${search.keyword-weight:0.3}")
-    private float keywordWeight;
-
-    @Value("${search.cache.enabled}")
-    private boolean cacheEnabled;
+    public SearchServiceImpl(
+            ElasticsearchClient elasticsearchClient,
+            MeterRegistry meterRegistry,
+            VectorizationService vectorizationService) {
+        this.elasticsearchClient = elasticsearchClient;
+        this.meterRegistry = meterRegistry;
+        this.vectorizationService = vectorizationService;
+    }
 
     @Override
-    @Cacheable(value = "searchResults", keyGenerator = "searchCacheKeyGenerator", unless = "#result == null")
-    public List<SearchResult> search(SearchRequest request) {
-        switch (request.getSearchType()) {
-            case VECTOR:
-                return vectorSearch(request);
-            case KEYWORD:
-                return keywordSearch(request);
-            case HYBRID:
-                return hybridSearch(request);
-            default:
-                throw new IllegalArgumentException("Unsupported search type: " + request.getSearchType());
+    public SearchResponse search(SearchRequest request) {
+        return switch (request.getSearchType()) {
+            case KEYWORD -> keywordSearch(request);
+            case VECTOR -> vectorSearch(request);
+            case HYBRID -> hybridSearch(request);
+        };
+    }
+
+    @Override
+    @Cacheable(value = "search", key = "#request.toString()", unless = "#result.total == 0")
+    public SearchResponse keywordSearch(SearchRequest request) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            Builder searchRequestBuilder = new Builder()
+                .index(Arrays.asList(request.getDocumentTypes().toArray(new String[0])))
+                .query(q -> q
+                    .multiMatch(m -> m
+                        .query(request.getQuery())
+                        .fields(Arrays.asList(request.getFields().toArray(new String[0])))
+                        .tieBreaker(0.3)
+                        .operator(Operator.And)
+                        .minimumShouldMatch("75%")
+                        .fuzziness("AUTO")
+                        .prefixLength(2)
+                        .maxExpansions(50)
+                        .lenient(true)
+                    )
+                )
+                .from((request.getPage() - 1) * request.getSize())
+                .size(request.getSize());
+
+            if (request.getMinScore() != null) {
+                searchRequestBuilder.minScore(request.getMinScore().doubleValue());
+            }
+
+            // 添加排序
+            if (request.getSortField() != null) {
+                searchRequestBuilder.sort(s -> s
+                    .field(f -> f
+                        .field(request.getSortField())
+                        .order(request.getSortOrder() != null ? 
+                            SortOrder.valueOf(request.getSortOrder().toUpperCase()) : 
+                            SortOrder.Desc)
+                    )
+                );
+            }
+
+            // 添加聚合
+            if (request.getAggregations() != null && !request.getAggregations().isEmpty()) {
+                for (String field : request.getAggregations()) {
+                    // 添加词条聚合
+                    searchRequestBuilder.aggregations(field + "_terms", a -> a
+                        .terms(t -> t
+                            .field(field)
+                            .size(AGGREGATION_SIZE)
+                        )
+                    );
+
+                    // 添加数值统计聚合（如果字段是数值类型）
+                    if (field.endsWith("Count") || field.endsWith("Amount") || field.endsWith("Price")) {
+                        searchRequestBuilder.aggregations(field + "_stats", a -> a
+                            .stats(s -> s
+                                .field(field)
+                            )
+                        );
+                    }
+                }
+            }
+
+            co.elastic.clients.elasticsearch.core.SearchResponse<Map> response = elasticsearchClient.search(
+                searchRequestBuilder.build(),
+                Map.class
+            );
+
+            // 更新搜索统计
+            updateSearchStats(request.getQuery());
+
+            meterRegistry.counter("search.total", "type", "keyword").increment();
+            meterRegistry.counter("search.results", "type", "keyword")
+                .increment(response.hits().total().value());
+
+            return convertToSearchResponse(response);
+        } catch (Exception e) {
+            meterRegistry.counter("search.errors", "type", "keyword").increment();
+            log.error("Keyword search failed", e);
+            throw new SearchException("SEARCH_FAILED", "Keyword search failed", e);
+        } finally {
+            sample.stop(meterRegistry.timer("search.duration", "type", "keyword"));
         }
     }
 
     @Override
-    @Cacheable(value = "vectorResults", keyGenerator = "searchCacheKeyGenerator", unless = "#result == null")
-    public List<SearchResult> vectorSearch(SearchRequest request) {
-        // 将查询文本转换为向量
-        float[] queryVector = vectorizationService.vectorize(request.getQuery());
-        
-        // 执行向量搜索
-        List<Map.Entry<String, Float>> vectorResults = vectorStorageService.search(
-            queryVector, request.getSize(), request.getMinSimilarity());
-        
-        // 获取文档详情
-        List<SearchResult> results = vectorResults.stream()
-            .map(entry -> {
-                String documentId = entry.getKey();
-                float score = entry.getValue();
-                
-                Optional<Document> document = documentService.getDocument(documentId);
-                if (document.isPresent()) {
-                    return SearchResult.builder()
-                        .documentId(documentId)
-                        .title(document.get().getTitle())
-                        .content(document.get().getContent())
-                        .score(score)
-                        .build();
-                }
-                return null;
-            })
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+    @Cacheable(value = "search", key = "'vector-' + #request.toString()", unless = "#result.total == 0")
+    public SearchResponse vectorSearch(SearchRequest request) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            float[] queryVector = vectorizationService.vectorizeWithCache(request.getQuery());
             
-        // 处理高亮和摘要
-        return searchHighlightService.processHighlights(results, request.getQuery());
-    }
+            Builder searchRequestBuilder = new Builder()
+                .index(Arrays.asList(request.getDocumentTypes().toArray(new String[0])))
+                .query(q -> q
+                    .scriptScore(s -> s
+                        .query(q2 -> q2.matchAll(m -> m))
+                        .script(sc -> sc
+                            .inline(i -> i
+                                .source("cosineSimilarity(params.query_vector, 'vector') + 1.0")
+                                .params("query_vector", JsonData.of(queryVector))
+                            )
+                        )
+                    )
+                )
+                .from((request.getPage() - 1) * request.getSize())
+                .size(request.getSize());
 
-    @Override
-    @Cacheable(value = "keywordResults", keyGenerator = "searchCacheKeyGenerator", unless = "#result == null")
-    public List<SearchResult> keywordSearch(SearchRequest request) {
-        // 构建并执行搜索查询
-        SearchHits<DocumentIndex> searchHits = elasticsearchOperations.search(
-            searchQueryBuilder.buildQuery(request), DocumentIndex.class);
-        
-        // 转换搜索结果
-        List<SearchResult> results = searchHits.getSearchHits().stream()
-            .map(hit -> {
-                DocumentIndex index = hit.getContent();
-                SearchResult result = SearchResult.builder()
-                    .documentId(index.getDocumentId())
-                    .title(index.getTitle())
-                    .content(index.getContent())
-                    .score(hit.getScore())
-                    .documentType(index.getDocumentType())
-                    .tags(index.getTags())
-                    .createTime(index.getCreateTime().toString())
-                    .updateTime(index.getUpdateTime().toString())
-                    .metadata(index.getMetadata())
-                    .build();
-                    
-                // 处理高亮字段
-                Map<String, List<String>> highlightFields = hit.getHighlightFields();
-                if (highlightFields != null) {
-                    if (highlightFields.containsKey("title")) {
-                        result.setHighlightedTitle(String.join("", highlightFields.get("title")));
-                    }
-                    if (highlightFields.containsKey("content")) {
-                        result.setHighlightedContents(highlightFields.get("content"));
-                    }
-                }
-                
-                return result;
-            })
-            .collect(Collectors.toList());
-            
-        // 处理高亮和摘要
-        return searchHighlightService.processHighlights(results, request.getQuery());
-    }
-
-    @Override
-    @Cacheable(value = "hybridResults", keyGenerator = "searchCacheKeyGenerator", unless = "#result == null")
-    public List<SearchResult> hybridSearch(SearchRequest request) {
-        // 执行向量搜索
-        List<SearchResult> vectorResults = vectorSearch(request);
-        
-        // 执行关键词搜索
-        List<SearchResult> keywordResults = keywordSearch(request);
-        
-        // 合并结果
-        Map<String, SearchResult> mergedResults = new HashMap<>();
-        
-        // 添加向量搜索结果
-        vectorResults.forEach(result -> {
-            result.setScore(result.getScore() * vectorWeight);
-            mergedResults.put(result.getDocumentId(), result);
-        });
-        
-        // 添加关键词搜索结果
-        keywordResults.forEach(result -> {
-            if (mergedResults.containsKey(result.getDocumentId())) {
-                // 如果文档已存在，更新分数
-                SearchResult existingResult = mergedResults.get(result.getDocumentId());
-                existingResult.setScore(existingResult.getScore() + result.getScore() * keywordWeight);
-            } else {
-                // 如果文档不存在，添加新结果
-                result.setScore(result.getScore() * keywordWeight);
-                mergedResults.put(result.getDocumentId(), result);
+            if (request.getMinScore() != null) {
+                searchRequestBuilder.minScore(request.getMinScore().doubleValue());
             }
-        });
-        
-        // 按分数排序并返回结果
-        return mergedResults.values().stream()
-            .sorted(Comparator.comparing(SearchResult::getScore).reversed())
-            .limit(request.getSize())
+
+            co.elastic.clients.elasticsearch.core.SearchResponse<Map> response = elasticsearchClient.search(
+                searchRequestBuilder.build(),
+                Map.class
+            );
+
+            // 更新搜索统计
+            updateSearchStats(request.getQuery());
+
+            meterRegistry.counter("search.total", "type", "vector").increment();
+            meterRegistry.counter("search.results", "type", "vector")
+                .increment(response.hits().total().value());
+
+            return convertToSearchResponse(response);
+        } catch (Exception e) {
+            meterRegistry.counter("search.errors", "type", "vector").increment();
+            log.error("Vector search failed", e);
+            throw new SearchException("SEARCH_FAILED", "Vector search failed", e);
+        } finally {
+            sample.stop(meterRegistry.timer("search.duration", "type", "vector"));
+        }
+    }
+
+    @Override
+    @Cacheable(value = "search", key = "'hybrid-' + #request.toString()", unless = "#result.total == 0")
+    public SearchResponse hybridSearch(SearchRequest request) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            SearchResponse keywordResults = keywordSearch(request);
+            SearchResponse vectorResults = vectorSearch(request);
+            
+            Map<String, SearchResponse.SearchResult> resultMap = new HashMap<>();
+            
+            for (SearchResponse.SearchResult result : keywordResults.getResults()) {
+                result.setScore(result.getScore() * KEYWORD_WEIGHT);
+                resultMap.put(result.getId(), result);
+            }
+            
+            for (SearchResponse.SearchResult result : vectorResults.getResults()) {
+                SearchResponse.SearchResult existingResult = resultMap.get(result.getId());
+                if (existingResult != null) {
+                    existingResult.setScore(existingResult.getScore() + result.getScore() * VECTOR_WEIGHT);
+                } else {
+                    result.setScore(result.getScore() * VECTOR_WEIGHT);
+                    resultMap.put(result.getId(), result);
+                }
+            }
+            
+            List<SearchResponse.SearchResult> mergedResults = new ArrayList<>(resultMap.values());
+            mergedResults.sort((a, b) -> Float.compare(b.getScore(), a.getScore()));
+            
+            if (request.getFilters() != null && !request.getFilters().isEmpty()) {
+                mergedResults = applyFilters(mergedResults, request.getFilters());
+            }
+            
+            if (mergedResults.size() > MAX_RESULTS) {
+                mergedResults = mergedResults.subList(0, MAX_RESULTS);
+            }
+            
+            // 更新搜索统计
+            updateSearchStats(request.getQuery());
+            
+            meterRegistry.counter("search.total", "type", "hybrid").increment();
+            meterRegistry.counter("search.results", "type", "hybrid")
+                .increment(mergedResults.size());
+            
+            return SearchResponse.builder()
+                .results(mergedResults)
+                .total(mergedResults.size())
+                .page(request.getPage())
+                .size(request.getSize())
+                .build();
+        } catch (Exception e) {
+            meterRegistry.counter("search.errors", "type", "hybrid").increment();
+            log.error("Hybrid search failed", e);
+            throw new SearchException("SEARCH_FAILED", "Hybrid search failed", e);
+        } finally {
+            sample.stop(meterRegistry.timer("search.duration", "type", "hybrid"));
+        }
+    }
+
+    @Override
+    public Map<String, Object> getSearchStats() {
+        return new HashMap<>(searchStats);
+    }
+
+    @Scheduled(fixedRate = 3600000) // 每小时执行一次
+    @CacheEvict(value = {"search", "suggestions"}, allEntries = true)
+    public void clearCache() {
+        log.info("Clearing search cache");
+    }
+
+    private void updateSearchStats(String query) {
+        searchStats.merge(query, 1L, Long::sum);
+    }
+
+    private List<SearchResponse.SearchResult> applyFilters(
+            List<SearchResponse.SearchResult> results,
+            Map<String, Object> filters) {
+        return results.stream()
+            .filter(result -> {
+                for (Map.Entry<String, Object> filter : filters.entrySet()) {
+                    String field = filter.getKey();
+                    Object value = filter.getValue();
+                    Object resultValue = result.getMetadata().get(field);
+                    
+                    if (resultValue == null || !resultValue.toString().equals(value.toString())) {
+                        return false;
+                    }
+                }
+                return true;
+            })
             .collect(Collectors.toList());
     }
 
-    /**
-     * 清除所有缓存
-     */
-    @CacheEvict(value = {"searchResults", "vectorResults", "keywordResults", "hybridResults"}, allEntries = true)
-    public void clearCache() {
-        log.info("Cleared all search caches");
+    private SearchResponse convertToSearchResponse(co.elastic.clients.elasticsearch.core.SearchResponse<Map> response) {
+        TotalHits totalHits = response.hits().total();
+        List<SearchResponse.SearchResult> results = new ArrayList<>();
+
+        for (Hit<Map> hit : response.hits().hits()) {
+            if (hit.source() == null) {
+                continue;
+            }
+
+            Map<String, Object> source = hit.source();
+            Map<String, List<String>> highlights = hit.highlight();
+            List<String> contentHighlights = highlights != null ? 
+                highlights.getOrDefault("content", List.of()) : List.of();
+
+            SearchResponse.SearchResult result = SearchResponse.SearchResult.builder()
+                .id(hit.id())
+                .title(getStringValue(source, "title"))
+                .content(getStringValue(source, "content"))
+                .type(getStringValue(source, "type"))
+                .score(hit.score() != null ? hit.score().floatValue() : 0.0f)
+                .metadata(source)
+                .highlights(contentHighlights)
+                .build();
+            results.add(result);
+        }
+
+        return SearchResponse.builder()
+            .results(results)
+            .total(totalHits != null ? totalHits.value() : 0)
+            .page(response.hits().hits().size() > 0 ? 
+                (int) (response.hits().hits().get(0).index().hashCode() % 100) : 1)
+            .size(response.hits().hits().size())
+            .build();
+    }
+
+    private String getStringValue(Map<String, Object> source, String key) {
+        Object value = source.get(key);
+        return value != null ? value.toString() : "";
     }
 } 

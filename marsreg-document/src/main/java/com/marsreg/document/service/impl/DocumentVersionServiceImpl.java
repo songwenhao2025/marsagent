@@ -3,7 +3,7 @@ package com.marsreg.document.service.impl;
 import com.marsreg.common.annotation.Log;
 import com.marsreg.common.annotation.Cache;
 import com.marsreg.common.exception.BusinessException;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentVersion;
 import com.marsreg.document.repository.DocumentVersionRepository;
 import com.marsreg.document.service.DocumentService;
@@ -32,13 +32,12 @@ public class DocumentVersionServiceImpl implements DocumentVersionService {
     @Log(module = "文档版本", operation = "创建", description = "创建文档版本")
     @Transactional
     public DocumentVersion createVersion(Long documentId, String comment, String createdBy) {
-        Document document = documentService.getDocument(documentId);
+        DocumentEntity document = documentService.getDocumentEntity(documentId)
+            .orElseThrow(() -> new BusinessException("文档不存在"));
         
         DocumentVersion version = DocumentVersion.builder()
             .documentId(documentId)
             .version(generateVersionNumber(documentId))
-            .storagePath(document.getStoragePath())
-            .bucket(document.getBucket())
             .objectName(document.getObjectName())
             .size(document.getSize())
             .contentType(document.getContentType())
@@ -84,7 +83,8 @@ public class DocumentVersionServiceImpl implements DocumentVersionService {
     @Transactional
     public DocumentVersion restoreVersion(Long versionId) {
         DocumentVersion version = getVersion(versionId);
-        Document document = documentService.getDocument(version.getDocumentId());
+        DocumentEntity document = documentService.getDocumentEntity(version.getDocumentId())
+            .orElseThrow(() -> new BusinessException("文档不存在"));
         
         // 创建新版本
         return createVersion(document.getId(), "从版本 " + version.getVersion() + " 恢复", version.getCreatedBy());

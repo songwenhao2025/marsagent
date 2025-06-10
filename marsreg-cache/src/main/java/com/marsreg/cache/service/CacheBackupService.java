@@ -101,5 +101,20 @@ public interface CacheBackupService {
          * 获取备份文件路径
          */
         String getBackupPath();
+
+        /**
+         * 开始备份
+         * @return 当前备份状态
+         */
+        BackupStatus start();
+
+        /**
+         * 完成备份
+         * @param backupCount 备份成功的数量
+         * @param failedCount 备份失败的数量
+         * @param backupPath 备份文件路径
+         * @return 当前备份状态
+         */
+        BackupStatus complete(long backupCount, long failedCount, String backupPath);
     }
 } 

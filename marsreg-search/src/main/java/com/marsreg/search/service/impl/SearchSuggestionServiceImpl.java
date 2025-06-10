@@ -7,13 +7,8 @@ import com.marsreg.search.service.UserBehaviorService;
 import com.marsreg.search.service.SynonymService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.search.suggest.SuggestBuilder;
-import org.elasticsearch.search.suggest.SuggestBuilders;
-import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -47,19 +42,21 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             return getHotSuggestions(size);
         }
         
-        // 从 Redis 获取建议
+        // 使用 reverseRangeWithScores 替代 reverseRangeByLexWithScores
         Set<ZSetOperations.TypedTuple<String>> suggestions = redisTemplate.opsForZSet()
-            .reverseRangeByLexWithScores(SUGGESTION_KEY, "[" + prefix, "[" + prefix + "\\xff", 0, size);
+            .reverseRangeWithScores(SUGGESTION_KEY, 0, size - 1);
             
         if (suggestions == null || suggestions.isEmpty()) {
             return Collections.emptyList();
         }
         
+        // 在内存中进行前缀过滤
         return suggestions.stream()
+            .filter(tuple -> tuple.getValue().startsWith(prefix))
             .map(tuple -> SearchSuggestion.builder()
                 .text(tuple.getValue())
-                .weight(tuple.getScore())
-                .type(SearchSuggestion.SuggestionType.KEYWORD)
+                .score(tuple.getScore())
+                .type("KEYWORD")
                 .build())
             .collect(Collectors.toList());
     }
@@ -77,8 +74,8 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         return hotSuggestions.stream()
             .map(tuple -> SearchSuggestion.builder()
                 .text(tuple.getValue())
-                .weight(tuple.getScore())
-                .type(SearchSuggestion.SuggestionType.HOT)
+                .score(tuple.getScore())
+                .type("HOT")
                 .build())
             .collect(Collectors.toList());
     }
@@ -91,17 +88,19 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         
         // 获取用户个性化建议
         Set<ZSetOperations.TypedTuple<String>> userSuggestions = redisTemplate.opsForZSet()
-            .reverseRangeByLexWithScores(USER_SUGGESTION_KEY + userId, "[" + prefix, "[" + prefix + "\\xff", 0, size);
+            .reverseRangeWithScores(USER_SUGGESTION_KEY + userId, 0, size - 1);
             
         if (userSuggestions == null || userSuggestions.isEmpty()) {
             return getSuggestions(prefix, size);
         }
         
+        // 在内存中进行前缀过滤
         return userSuggestions.stream()
+            .filter(tuple -> tuple.getValue().startsWith(prefix))
             .map(tuple -> SearchSuggestion.builder()
                 .text(tuple.getValue())
-                .weight(tuple.getScore())
-                .type(SearchSuggestion.SuggestionType.PERSONALIZED)
+                .score(tuple.getScore())
+                .type("PERSONALIZED")
                 .build())
             .collect(Collectors.toList());
     }
@@ -121,7 +120,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         }
     }
 
-    @Override
     public void recordSearchKeyword(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return;
@@ -230,8 +228,15 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         if (query == null || query.trim().isEmpty()) {
             return 0.0;
         }
-        
-        Double weight = redisTemplate.opsForValue().get(QUERY_WEIGHT_KEY + query);
+        String weightStr = redisTemplate.opsForValue().get(QUERY_WEIGHT_KEY + query);
+        Double weight = null;
+        if (weightStr != null) {
+            try {
+                weight = Double.parseDouble(weightStr);
+            } catch (NumberFormatException e) {
+                weight = 1.0;
+            }
+        }
         return weight != null ? weight : 1.0;
     }
     
@@ -240,8 +245,15 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         if (term == null || term.trim().isEmpty()) {
             return 0.0;
         }
-        
-        Double weight = redisTemplate.opsForValue().get(TERM_WEIGHT_KEY + term);
+        String weightStr = redisTemplate.opsForValue().get(TERM_WEIGHT_KEY + term);
+        Double weight = null;
+        if (weightStr != null) {
+            try {
+                weight = Double.parseDouble(weightStr);
+            } catch (NumberFormatException e) {
+                weight = 1.0;
+            }
+        }
         return weight != null ? weight : 1.0;
     }
     

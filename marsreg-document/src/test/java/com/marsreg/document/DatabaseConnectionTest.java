@@ -130,26 +130,42 @@ class DatabaseConnectionTest {
 
     @Test
     void testCreateIndexes() {
-        // documents 表的索引
-        jdbcTemplate.execute("CREATE INDEX idx_documents_name ON documents(name)");
-        jdbcTemplate.execute("CREATE INDEX idx_documents_create_time ON documents(create_time)");
-        jdbcTemplate.execute("CREATE INDEX idx_documents_update_time ON documents(update_time)");
-        jdbcTemplate.execute("CREATE INDEX idx_documents_status ON documents(status)");
+        // 检查并创建索引的辅助方法
+        createIndexIfNotExists("documents", "idx_documents_name", "name");
+        createIndexIfNotExists("documents", "idx_documents_create_time", "create_time");
+        createIndexIfNotExists("documents", "idx_documents_update_time", "update_time");
+        createIndexIfNotExists("documents", "idx_documents_status", "status");
 
-        // document_versions 表的索引
-        jdbcTemplate.execute("CREATE INDEX idx_document_versions_document_id ON document_versions(document_id)");
-        jdbcTemplate.execute("CREATE INDEX idx_document_versions_version ON document_versions(version)");
+        createIndexIfNotExists("document_versions", "idx_document_versions_document_id", "document_id");
+        createIndexIfNotExists("document_versions", "idx_document_versions_version", "version");
 
-        // document_chunks 表的索引
-        jdbcTemplate.execute("CREATE INDEX idx_document_chunks_document_id ON document_chunks(document_id)");
-        jdbcTemplate.execute("CREATE INDEX idx_document_chunks_chunk_index ON document_chunks(chunk_index)");
+        createIndexIfNotExists("document_chunks", "idx_document_chunks_document_id", "document_id");
+        createIndexIfNotExists("document_chunks", "idx_document_chunks_chunk_index", "chunk_index");
 
-        // document_permissions 表的索引
-        jdbcTemplate.execute("CREATE INDEX idx_document_permissions_document_user ON document_permissions(document_id, user_id)");
+        createIndexIfNotExists("document_permissions", "idx_document_permissions_document_user", "document_id, user_id");
 
-        // document_tags 表的索引
-        jdbcTemplate.execute("CREATE INDEX idx_document_tags_document_id ON document_tags(document_id)");
+        createIndexIfNotExists("document_tags", "idx_document_tags_document_id", "document_id");
 
-        System.out.println("所有索引创建完成！");
+        System.out.println("所有索引检查/创建完成！");
+    }
+
+    private void createIndexIfNotExists(String tableName, String indexName, String columns) {
+        // 检查索引是否存在
+        List<Map<String, Object>> existingIndexes = jdbcTemplate.queryForList(
+            "SELECT INDEX_NAME FROM information_schema.STATISTICS " +
+            "WHERE TABLE_SCHEMA = 'mars_db' AND TABLE_NAME = ? AND INDEX_NAME = ?",
+            tableName, indexName
+        );
+
+        if (existingIndexes.isEmpty()) {
+            try {
+                jdbcTemplate.execute(String.format("CREATE INDEX %s ON %s(%s)", indexName, tableName, columns));
+                System.out.println("创建索引: " + indexName + " 在表 " + tableName + " 上");
+            } catch (Exception e) {
+                System.out.println("创建索引失败: " + indexName + " - " + e.getMessage());
+            }
+        } else {
+            System.out.println("索引已存在: " + indexName + " 在表 " + tableName + " 上");
+        }
     }
 } 

@@ -16,13 +16,14 @@ import lombok.Builder;
 @EqualsAndHashCode(callSuper = true)
 public class DocumentTag extends BaseEntity {
 
-    @Column(nullable = false)
-    private Long documentId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "name")
     private String name;
 
-    @Column
+    @Column(name = "description")
     private String description;
 
     @Column(nullable = false)
@@ -30,4 +31,7 @@ public class DocumentTag extends BaseEntity {
 
     @Column(nullable = false)
     private String createdBy;
+
+    @ManyToMany(mappedBy = "tags")
+    private java.util.List<DocumentEntity> documents;
 } 

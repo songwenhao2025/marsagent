@@ -2,6 +2,8 @@ package com.marsreg.search.service.impl;
 
 import com.marsreg.search.model.SearchStatistics;
 import com.marsreg.search.model.UserBehaviorStats;
+import com.marsreg.search.model.SearchType;
+import com.marsreg.search.model.UserBehaviorStats.KeywordStats;
 import com.marsreg.search.service.DataExportService;
 import com.marsreg.search.service.SearchStatisticsService;
 import com.marsreg.search.service.UserBehaviorService;
@@ -140,11 +142,11 @@ public class DataExportServiceImpl implements DataExportService {
             
             // 写入搜索类型分布
             printer.printRecord("搜索类型分布", "");
-            for (Map.Entry<String, Long> entry : stats.getSearchTypeDistribution().entrySet()) {
+            for (Map.Entry<SearchType, Long> entry : stats.getSearchTypeDistribution().entrySet()) {
                 try {
-                    printer.printRecord(entry.getKey(), entry.getValue());
+                    printer.printRecord(entry.getKey().toString(), entry.getValue());
                 } catch (IOException e) {
-                    log.error("Failed to write search type distribution", e);
+                    log.error("写入搜索类型分布数据失败", e);
                 }
             }
             
@@ -198,9 +200,9 @@ public class DataExportServiceImpl implements DataExportService {
             row.createCell(0).setCellValue("搜索类型分布");
             rowNum++;
             
-            for (Map.Entry<String, Long> entry : stats.getSearchTypeDistribution().entrySet()) {
+            for (Map.Entry<SearchType, Long> entry : stats.getSearchTypeDistribution().entrySet()) {
                 row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(entry.getKey());
+                row.createCell(0).setCellValue(entry.getKey().toString());
                 row.createCell(1).setCellValue(entry.getValue());
             }
             
@@ -238,7 +240,9 @@ public class DataExportServiceImpl implements DataExportService {
                     userId,
                     stats.getSearchCount(),
                     stats.getAverageResponseTime(),
-                    String.join(",", stats.getFrequentKeywords()),
+                    stats.getFrequentKeywords().stream()
+                        .map(KeywordStats::getKeyword)
+                        .collect(Collectors.joining(",")),
                     stats.getActiveTimeDistribution().toString()
                 );
             }
@@ -275,7 +279,9 @@ public class DataExportServiceImpl implements DataExportService {
                 row.createCell(0).setCellValue(userId);
                 row.createCell(1).setCellValue(stats.getSearchCount());
                 row.createCell(2).setCellValue(stats.getAverageResponseTime());
-                row.createCell(3).setCellValue(String.join(",", stats.getFrequentKeywords()));
+                row.createCell(3).setCellValue(stats.getFrequentKeywords().stream()
+                    .map(KeywordStats::getKeyword)
+                    .collect(Collectors.joining(",")));
                 row.createCell(4).setCellValue(stats.getActiveTimeDistribution().toString());
             }
             
@@ -368,7 +374,7 @@ public class DataExportServiceImpl implements DataExportService {
             // 获取热门关键词
             List<SearchStatistics.KeywordStats> keywordList = searchStatisticsService.getHotKeywords(size);
             for (SearchStatistics.KeywordStats keyword : keywordList) {
-                printer.printRecord(keyword.getKeyword(), keyword.getCount());
+                printer.printRecord(keyword.getKeyword(), keyword.getSearchCount());
             }
         }
     }
@@ -395,7 +401,7 @@ public class DataExportServiceImpl implements DataExportService {
             for (SearchStatistics.KeywordStats keyword : keywordList) {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(keyword.getKeyword());
-                row.createCell(1).setCellValue(keyword.getCount());
+                row.createCell(1).setCellValue(keyword.getSearchCount());
             }
             
             // 自动调整列宽

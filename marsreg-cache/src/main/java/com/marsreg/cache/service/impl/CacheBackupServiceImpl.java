@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Service
@@ -247,60 +246,5 @@ public class CacheBackupServiceImpl implements CacheBackupService {
             return objectMapper.readValue(backupFile, Map.class);
         }
         return null;
-    }
-
-    private static class BackupStatusImpl implements BackupStatus {
-        private final AtomicLong backupCount = new AtomicLong(0);
-        private final AtomicLong failedCount = new AtomicLong(0);
-        private final AtomicLong startTime = new AtomicLong(0);
-        private final AtomicLong endTime = new AtomicLong(0);
-        private String backupPath;
-
-        public void start() {
-            startTime.set(System.currentTimeMillis());
-        }
-
-        public void complete(long backup, long failed, String path) {
-            backupCount.set(backup);
-            failedCount.set(failed);
-            endTime.set(System.currentTimeMillis());
-            backupPath = path;
-        }
-
-        @Override
-        public long getBackupCount() {
-            return backupCount.get();
-        }
-
-        @Override
-        public long getFailedCount() {
-            return failedCount.get();
-        }
-
-        @Override
-        public long getStartTime() {
-            return startTime.get();
-        }
-
-        @Override
-        public long getEndTime() {
-            return endTime.get();
-        }
-
-        @Override
-        public long getDuration() {
-            return endTime.get() - startTime.get();
-        }
-
-        @Override
-        public double getSuccessRate() {
-            long total = backupCount.get() + failedCount.get();
-            return total == 0 ? 0.0 : (double) backupCount.get() / total * 100;
-        }
-
-        @Override
-        public String getBackupPath() {
-            return backupPath;
-        }
     }
 } 

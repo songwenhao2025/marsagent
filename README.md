@@ -1,103 +1,105 @@
-# MarsReg - 高性能RAG系统
+# MarsReg 项目
 
-MarsReg是一个高性能的检索增强生成（RAG）系统，支持PB级海量文档的存储、检索和推理。
+MarsReg 是一个基于 Spring Boot 的文档管理和搜索系统。
 
-## 系统架构
+## 技术栈
 
-### 核心模块
-- marsreg-common: 公共模块，包含通用工具类和基础组件
-- marsreg-document: 文档管理模块，负责文档的存储和管理
-- marsreg-vector: 向量化模块，负责文本向量化和索引
-- marsreg-search: 检索模块，提供高性能的语义搜索能力
-- marsreg-inference: 推理模块，集成大语言模型进行问答
-- marsreg-cache: 缓存模块，提供多级缓存加速
-- marsreg-monitor: 监控模块，负责系统监控和告警
-
-### 技术栈
-- 基础框架：Spring Boot 3.2.3, Spring Cloud 2023.0.0
-- 存储系统：MinIO, Elasticsearch, Redis, Milvus
-- 监控系统：Prometheus, Grafana, ELK Stack
-
-## 快速开始
-
-### 环境要求
-- JDK 17+
-- Maven 3.8+
+- Java 17
+- Spring Boot 3.2.3
+- Spring Data JPA
+- Spring Data Elasticsearch
+- MySQL 8.0
+- Elasticsearch 8.12.1
+- Redis 7.2
+- Milvus 2.3.4
 - Docker & Docker Compose
 
-### 构建项目
-```bash
-mvn clean install
-```
+## 项目结构
 
-### 运行服务
-```bash
-# 启动基础设施
-docker-compose up -d
-
-# 启动应用服务
-java -jar marsreg-document/target/marsreg-document.jar
-java -jar marsreg-vector/target/marsreg-vector.jar
-java -jar marsreg-search/target/marsreg-search.jar
-java -jar marsreg-inference/target/marsreg-inference.jar
-```
-
-## 开发指南
-
-### 项目结构
 ```
 marsreg/
 ├── marsreg-common/        # 公共模块
 ├── marsreg-document/      # 文档管理模块
-├── marsreg-vector/        # 向量化模块
-├── marsreg-search/        # 检索模块
-├── marsreg-inference/     # 推理模块
+├── marsreg-search/        # 搜索模块
+├── marsreg-vector/        # 向量存储模块
 ├── marsreg-cache/         # 缓存模块
-└── marsreg-monitor/       # 监控模块
+└── marsreg-inference/     # 推理模块
 ```
 
-### 开发规范
-1. 遵循阿里巴巴Java开发手册
-2. 使用统一的代码格式化工具
-3. 编写单元测试，保持测试覆盖率
-4. 使用Git Flow工作流
+## 快速开始
 
-## 部署指南
+### 环境要求
 
-### 系统要求
-- CPU: 16核+
-- 内存: 32GB+
-- 存储: SSD, 1TB+
-- 网络: 千兆网络
+- JDK 17+
+- Maven 3.9+
+- Docker & Docker Compose
 
-### 部署步骤
-1. 准备环境
-2. 配置系统参数
-3. 部署基础设施
-4. 部署应用服务
-5. 配置监控系统
+### 本地开发
 
-## 监控告警
+1. 克隆项目
+```bash
+git clone https://github.com/your-username/marsreg.git
+cd marsreg
+```
 
-### 监控指标
-- 系统资源使用率
-- 服务响应时间
-- 错误率统计
-- 业务指标监控
+2. 使用 Maven 构建
+```bash
+./mvnw clean install
+```
 
-### 告警规则
-- CPU使用率 > 80%
-- 内存使用率 > 85%
-- 响应时间 > 1s
-- 错误率 > 1%
+3. 运行测试
+```bash
+./mvnw test
+```
+
+### Docker 部署
+
+1. 构建并启动服务
+```bash
+docker-compose up -d
+```
+
+2. 查看服务状态
+```bash
+docker-compose ps
+```
+
+3. 查看服务日志
+```bash
+docker-compose logs -f
+```
+
+## API 文档
+
+启动服务后，访问以下地址查看 API 文档：
+
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- OpenAPI 规范: http://localhost:8080/v3/api-docs
+
+## 开发指南
+
+### 添加新功能
+
+1. 在相应的模块中创建新的功能类
+2. 编写单元测试
+3. 更新 API 文档
+4. 提交 Pull Request
+
+### 代码规范
+
+- 遵循 Google Java Style Guide
+- 使用 Lombok 简化代码
+- 编写完整的单元测试
+- 保持代码简洁和可维护性
 
 ## 贡献指南
 
 1. Fork 项目
 2. 创建特性分支
-3. 提交代码
-4. 创建 Pull Request
+3. 提交更改
+4. 推送到分支
+5. 创建 Pull Request
 
 ## 许可证
 
-Apache License 2.0 
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件 

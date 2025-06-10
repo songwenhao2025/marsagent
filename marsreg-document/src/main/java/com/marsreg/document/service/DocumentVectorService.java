@@ -1,6 +1,6 @@
 package com.marsreg.document.service;
 
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentChunk;
 
 import java.util.List;
@@ -8,11 +8,33 @@ import java.util.Map;
 
 public interface DocumentVectorService {
     /**
+     * 生成文档向量
+     * @param document 文档
+     * @return 文档向量
+     */
+    float[] generateVector(DocumentEntity document);
+
+    /**
+     * 批量生成文档向量
+     * @param documents 文档列表
+     * @return 文档向量映射
+     */
+    Map<Long, float[]> generateVectors(List<DocumentEntity> documents);
+
+    /**
+     * 计算向量相似度
+     * @param vector1 向量1
+     * @param vector2 向量2
+     * @return 相似度
+     */
+    float calculateSimilarity(float[] vector1, float[] vector2);
+
+    /**
      * 向量化文档分块并存储
      * @param document 文档
      * @param chunks 文档分块列表
      */
-    void vectorizeAndStore(Document document, List<DocumentChunk> chunks);
+    void vectorizeAndStore(DocumentEntity document, List<DocumentChunk> chunks);
 
     /**
      * 批量向量化文档分块并存储
@@ -52,4 +74,10 @@ public interface DocumentVectorService {
      * @return 搜索结果列表，每个结果包含分块内容和相似度分数
      */
     List<Map<String, Object>> searchChunksByDocument(Long documentId, String query, int limit, float minScore);
+
+    /**
+     * 更新文档向量
+     * @param document 文档实体
+     */
+    void updateDocumentVector(DocumentEntity document);
 } 

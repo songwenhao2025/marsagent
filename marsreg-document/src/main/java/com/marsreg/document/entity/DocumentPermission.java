@@ -1,33 +1,40 @@
 package com.marsreg.document.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "document_permissions")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class DocumentPermission extends BaseEntity {
+@Table(name = "document_permissions")
+public class DocumentPermission {
 
-    @Column(nullable = false)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "document_id", nullable = false)
     private Long documentId;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private String userId;
 
     @Column(nullable = false)
-    private String permission; // READ, WRITE, ADMIN
+    private String permission;
 
-    @Column(nullable = false)
+    @Column(name = "granted_by", nullable = false)
     private String grantedBy;
 
-    @Column(nullable = false)
-    private Boolean inherited;
+    @Column(name = "granted_at", nullable = false)
+    private LocalDateTime grantedAt;
+
+    @Column(name = "is_inherited")
+    private boolean isInherited;
 } 

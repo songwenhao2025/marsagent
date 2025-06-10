@@ -3,6 +3,8 @@ package com.marsreg.search.controller;
 import com.marsreg.search.model.ExportProgress;
 import com.marsreg.search.service.DataExportService;
 import com.marsreg.search.service.ExportTaskService;
+import com.marsreg.search.service.ExportTaskService.SchedulingStrategy;
+import com.marsreg.search.service.ExportTaskService.ExportFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -96,7 +98,9 @@ public class DataExportController {
             ExportTaskService.ExportTaskParams params = new ExportTaskService.ExportTaskParams();
             
             if (task.containsKey("userIds")) {
-                params.setUserIds((List<String>) task.get("userIds"));
+                @SuppressWarnings("unchecked")
+                List<String> userIds = (List<String>) task.get("userIds");
+                params.setUserIds(userIds);
             }
             if (task.containsKey("startTime")) {
                 params.setStartTime(LocalDateTime.parse((String) task.get("startTime")));
@@ -108,7 +112,7 @@ public class DataExportController {
                 params.setFormat(DataExportService.ExportFormat.valueOf((String) task.get("format")));
             }
             if (task.containsKey("size")) {
-                params.setSize((Integer) task.get("size"));
+                params.setSize(((Number) task.get("size")).intValue());
             }
             
             taskTypes.add(taskType);

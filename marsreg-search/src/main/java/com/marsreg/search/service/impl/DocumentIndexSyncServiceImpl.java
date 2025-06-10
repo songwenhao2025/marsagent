@@ -1,50 +1,51 @@
 package com.marsreg.search.service.impl;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
+import com.marsreg.common.model.Document;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.repository.DocumentIndexRepository;
 import com.marsreg.search.service.DocumentIndexSyncService;
-import com.marsreg.vector.service.VectorizationService;
-import com.marsreg.vector.service.VectorStorageService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DocumentIndexSyncServiceImpl implements DocumentIndexSyncService {
 
-    private final DocumentService documentService;
-    private final DocumentIndexRepository documentIndexRepository;
-    private final VectorizationService vectorizationService;
-    private final VectorStorageService vectorStorageService;
+    @Autowired
+    private DocumentIndexRepository documentIndexRepository;
+
+    @Autowired
+    private ElasticsearchOperations elasticsearchOperations;
 
     @Override
     @Transactional
-    public void syncDocument(Document document) {
+    public void indexDocument(Document document) {
         try {
-            // 将文档转换为索引对象
-            DocumentIndex index = convertToIndex(document);
-            
-            // 保存到 Elasticsearch
+            DocumentIndex index = toDocumentIndex(document);
             documentIndexRepository.save(index);
-            
-            // 生成文档向量并存储
-            float[] vector = vectorizationService.vectorize(document.getContent());
-            vectorStorageService.store(document.getId(), vector);
-            
-            log.info("Successfully synced document to index: {}", document.getId());
+            log.info("文档已成功索引: {}", document.getId());
         } catch (Exception e) {
-            log.error("Failed to sync document to index: " + document.getId(), e);
-            throw new RuntimeException("Failed to sync document to index", e);
+            log.error("索引文档失败: " + document.getId(), e);
+            throw new RuntimeException("索引文档失败", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateDocument(Document document) {
+        try {
+            DocumentIndex index = toDocumentIndex(document);
+            documentIndexRepository.save(index);
+            log.info("文档已成功更新: {}", document.getId());
+        } catch (Exception e) {
+            log.error("更新文档索引失败: " + document.getId(), e);
+            throw new RuntimeException("更新文档索引失败", e);
         }
     }
 
@@ -52,77 +53,46 @@ public class DocumentIndexSyncServiceImpl implements DocumentIndexSyncService {
     @Transactional
     public void deleteDocument(String documentId) {
         try {
-            // 从 Elasticsearch 中删除
             documentIndexRepository.deleteById(documentId);
-            
-            // 从向量存储中删除
-            vectorStorageService.delete(documentId);
-            
-            log.info("Successfully deleted document from index: {}", documentId);
+            log.info("文档已成功从索引中删除: {}", documentId);
         } catch (Exception e) {
-            log.error("Failed to delete document from index: " + documentId, e);
-            throw new RuntimeException("Failed to delete document from index", e);
+            log.error("从索引中删除文档失败: " + documentId, e);
+            throw new RuntimeException("从索引中删除文档失败", e);
         }
     }
 
     @Override
     @Transactional
-    public void batchSyncDocuments(Iterable<Document> documents) {
-        List<DocumentIndex> indices = new ArrayList<>();
-        for (Document document : documents) {
-            try {
-                // 转换为索引对象
-                DocumentIndex index = convertToIndex(document);
-                indices.add(index);
-                
-                // 生成文档向量并存储
-                float[] vector = vectorizationService.vectorize(document.getContent());
-                vectorStorageService.store(document.getId(), vector);
-            } catch (Exception e) {
-                log.error("Failed to process document for batch sync: " + document.getId(), e);
-            }
-        }
-        
-        // 批量保存到 Elasticsearch
-        documentIndexRepository.saveAll(indices);
-        log.info("Successfully batch synced {} documents to index", indices.size());
-    }
-
-    @Override
-    @Transactional
-    public void rebuildIndex() {
+    public void reindexAll() {
         try {
             // 清空现有索引
             documentIndexRepository.deleteAll();
-            vectorStorageService.deleteByPrefix("");
+            log.info("已清空现有索引");
             
-            // 分页获取所有文档
-            int pageSize = 100;
-            int pageNumber = 0;
-            Page<Document> page;
-            
-            do {
-                page = documentService.listDocuments(PageRequest.of(pageNumber, pageSize));
-                batchSyncDocuments(page.getContent());
-                pageNumber++;
-            } while (page.hasNext());
-            
-            log.info("Successfully rebuilt index");
+            // 重新创建索引
+            elasticsearchOperations.indexOps(DocumentIndex.class).create();
+            log.info("已重新创建索引");
         } catch (Exception e) {
-            log.error("Failed to rebuild index", e);
-            throw new RuntimeException("Failed to rebuild index", e);
+            log.error("重建索引失败", e);
+            throw new RuntimeException("重建索引失败", e);
         }
     }
 
-    private DocumentIndex convertToIndex(Document document) {
-        DocumentIndex index = new DocumentIndex();
-        index.setId(document.getId());
-        index.setDocumentId(document.getId());
-        index.setTitle(document.getTitle());
-        index.setContent(document.getContent());
-        index.setMetadata(document.getMetadata());
-        index.setCreateTime(document.getCreateTime());
-        index.setUpdateTime(document.getUpdateTime());
-        return index;
+    private DocumentIndex toDocumentIndex(Document document) {
+        return DocumentIndex.builder()
+                .documentId(document.getId())
+                .title(document.getTitle())
+                .content(document.getContent())
+                .documentType(document.getType())
+                .status(document.getStatus())
+                .contentType(document.getContentType())
+                .originalName(document.getOriginalName())
+                .size(document.getSize())
+                .createTime(document.getCreateTime())
+                .updateTime(document.getUpdateTime())
+                .createBy(document.getCreateBy())
+                .updateBy(document.getUpdateBy())
+                .metadata(document.getMetadata())
+                .build();
     }
 } 

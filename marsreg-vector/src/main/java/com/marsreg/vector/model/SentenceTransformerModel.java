@@ -1,30 +1,37 @@
 package com.marsreg.vector.model;
 
 import ai.djl.Device;
+import ai.djl.Model;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Input;
 import ai.djl.modality.Output;
+import ai.djl.ndarray.NDArray;
+import ai.djl.ndarray.NDList;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.repository.zoo.ZooModel;
 import ai.djl.training.util.ProgressBar;
+import ai.djl.translate.Translator;
+import ai.djl.translate.TranslatorContext;
 import com.marsreg.vector.config.VectorizationConfig;
 import com.marsreg.vector.exception.VectorizationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class SentenceTransformerModel implements VectorizationModel {
     
-    private final VectorizationConfig config;
+    private final VectorizationConfig.Model config;
     private final AtomicReference<ZooModel<Input, Output>> modelRef = new AtomicReference<>();
     private final ReentrantReadWriteLock modelLock = new ReentrantReadWriteLock();
     private volatile boolean isWarmedUp = false;
@@ -33,63 +40,25 @@ public class SentenceTransformerModel implements VectorizationModel {
     private final ThreadLocal<Predictor<Input, Output>> predictorCache = new ThreadLocal<>();
     private static final int PREDICTOR_CACHE_TIMEOUT = 300; // 5分钟
     
+    private final Model model;
+    
     @Override
     public String getModelName() {
-        return config.getModel().getModelName();
+        return config.getName();
     }
     
     @Override
     public String getModelVersion() {
-        return config.getModel().getModelVersion();
+        return config.getVersion();
     }
     
     @Override
     public int getDimension() {
-        return config.getModel().getVectorDimension();
+        return config.getDimension();
     }
     
-    @Override
-    public List<Float> vectorize(String text) {
-        try {
-            Predictor<Input, Output> predictor = getPredictor();
-            try {
-                Input input = new Input();
-                input.add(text);
-                Output output = predictor.predict(input);
-                return parseOutput(output);
-            } finally {
-                // 不关闭预测器，而是返回缓存
-                returnPredictor(predictor);
-            }
-        } catch (Exception e) {
-            log.error("文本向量化失败", e);
-            throw new VectorizationException("文本向量化失败: " + e.getMessage());
-        }
-    }
-    
-    @Override
-    public List<List<Float>> batchVectorize(List<String> texts) {
-        if (texts.isEmpty()) {
-            return new ArrayList<>();
-        }
-        
-        try {
-            Predictor<Input, Output> predictor = getPredictor();
-            try {
-                Input input = new Input();
-                for (String text : texts) {
-                    input.add(text);
-                }
-                Output output = predictor.predict(input);
-                return parseBatchOutput(output, texts.size());
-            } finally {
-                // 不关闭预测器，而是返回缓存
-                returnPredictor(predictor);
-            }
-        } catch (Exception e) {
-            log.error("批量文本向量化失败", e);
-            throw new VectorizationException("批量文本向量化失败: " + e.getMessage());
-        }
+    public String getModelPath() {
+        return config.getPath();
     }
     
     @Override
@@ -115,7 +84,7 @@ public class SentenceTransformerModel implements VectorizationModel {
                 );
                 
                 // 预热模型
-                batchVectorize(warmupTexts);
+                encode(warmupTexts);
                 isWarmedUp = true;
                 log.info("向量化模型预热完成");
             } finally {
@@ -167,36 +136,45 @@ public class SentenceTransformerModel implements VectorizationModel {
     }
     
     private ZooModel<Input, Output> getModel() {
-        ZooModel<Input, Output> model = modelRef.get();
-        if (model == null) {
-            modelLock.writeLock().lock();
-            try {
-                model = modelRef.get();
-                if (model == null) {
-                    Criteria<Input, Output> criteria = Criteria.builder()
-                        .setTypes(Input.class, Output.class)
-                        .optModelPath(java.nio.file.Paths.get(config.getModel().getModelPath()))
-                        .optDevice(Device.cpu())
-                        .optProgress(new ProgressBar())
-                        .build();
-                    
-                    model = criteria.loadModel();
-                    modelRef.set(model);
+        try {
+            ZooModel<Input, Output> model = modelRef.get();
+            if (model == null) {
+                modelLock.writeLock().lock();
+                try {
+                    model = modelRef.get();
+                    if (model == null) {
+                        Criteria<Input, Output> criteria = Criteria.builder()
+                            .setTypes(Input.class, Output.class)
+                            .optModelPath(java.nio.file.Paths.get(config.getPath()))
+                            .optDevice(Device.cpu())
+                            .optProgress(new ProgressBar())
+                            .build();
+                        model = criteria.loadModel();
+                        modelRef.set(model);
+                    }
+                } finally {
+                    modelLock.writeLock().unlock();
                 }
-            } finally {
-                modelLock.writeLock().unlock();
             }
+            return model;
+        } catch (ai.djl.repository.zoo.ModelNotFoundException | ai.djl.MalformedModelException | java.io.IOException e) {
+            log.error("加载模型失败", e);
+            throw new RuntimeException("加载模型失败", e);
         }
-        return model;
     }
     
     private Predictor<Input, Output> getPredictor() {
-        Predictor<Input, Output> predictor = predictorCache.get();
-        if (predictor == null) {
-            predictor = getModel().newPredictor();
-            predictorCache.set(predictor);
+        try {
+            Predictor<Input, Output> predictor = predictorCache.get();
+            if (predictor == null) {
+                predictor = getModel().newPredictor();
+                predictorCache.set(predictor);
+            }
+            return predictor;
+        } catch (Exception e) {
+            log.error("获取预测器失败", e);
+            throw new RuntimeException("获取预测器失败", e);
         }
-        return predictor;
     }
     
     private void returnPredictor(Predictor<Input, Output> predictor) {
@@ -211,37 +189,84 @@ public class SentenceTransformerModel implements VectorizationModel {
         }
     }
     
-    private List<Float> parseOutput(Output output) {
-        float[] data = output.getData().getAsFloatArray();
-        List<Float> vector = new ArrayList<>(data.length);
-        for (float v : data) {
-            vector.add(v);
-        }
-        return vector;
-    }
-    
-    private List<List<Float>> parseBatchOutput(Output output, int batchSize) {
-        float[] data = output.getData().getAsFloatArray();
-        int dimension = getDimension();
-        List<List<Float>> vectors = new ArrayList<>(batchSize);
-        
-        for (int i = 0; i < batchSize; i++) {
-            List<Float> vector = new ArrayList<>(dimension);
-            for (int j = 0; j < dimension; j++) {
-                vector.add(data[i * dimension + j]);
-            }
-            vectors.add(vector);
-        }
-        
-        return vectors;
-    }
-    
     // 在Spring容器关闭时调用
     public void destroy() {
         closeAllPredictors();
         ZooModel<Input, Output> model = modelRef.get();
         if (model != null) {
             model.close();
+        }
+    }
+
+    public float[] encode(String text) {
+        try {
+            Translator<String, float[]> translator = new TextEmbeddingTranslator();
+            try (Predictor<String, float[]> predictor = model.newPredictor(translator)) {
+                return predictor.predict(text);
+            }
+        } catch (Exception e) {
+            log.error("文本编码失败: {}", text, e);
+            throw new RuntimeException("文本编码失败", e);
+        }
+    }
+
+    public List<float[]> encode(List<String> texts) {
+        try {
+            Translator<String, float[]> translator = new TextEmbeddingTranslator();
+            try (Predictor<String, float[]> predictor = model.newPredictor(translator)) {
+                return texts.stream()
+                    .map(text -> {
+                        try {
+                            return predictor.predict(text);
+                        } catch (Exception e) {
+                            log.error("文本编码失败: {}", text, e);
+                            throw new RuntimeException("文本编码失败", e);
+                        }
+                    })
+                    .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.error("批量文本编码失败", e);
+            throw new RuntimeException("批量文本编码失败", e);
+        }
+    }
+
+    @Override
+    public List<List<Float>> batchVectorize(List<String> texts) {
+        List<float[]> vectors = encode(texts);
+        return vectors.stream()
+            .map(vector -> {
+                List<Float> result = new ArrayList<>(vector.length);
+                for (float v : vector) {
+                    result.add(v);
+                }
+                return result;
+            })
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Float> vectorize(String text) {
+        float[] vector = encode(text);
+        List<Float> result = new ArrayList<>(vector.length);
+        for (float v : vector) {
+            result.add(v);
+        }
+        return result;
+    }
+
+    private static class TextEmbeddingTranslator implements Translator<String, float[]> {
+        @Override
+        public float[] processOutput(TranslatorContext ctx, NDList list) {
+            NDArray array = list.get(0);
+            return array.toFloatArray();
+        }
+
+        @Override
+        public NDList processInput(TranslatorContext ctx, String input) {
+            NDList list = new NDList();
+            list.add(ctx.getNDManager().create(input));
+            return list;
         }
     }
 } 

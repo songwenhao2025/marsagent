@@ -76,4 +76,12 @@ public class MetricsService {
     public void decrementCacheSize() {
         cacheSize.decrementAndGet();
     }
+    
+    public Timer getInferenceTimer() {
+        return inferenceTimer;
+    }
+    
+    public Timer getStreamInferenceTimer() {
+        return streamInferenceTimer;
+    }
 } 

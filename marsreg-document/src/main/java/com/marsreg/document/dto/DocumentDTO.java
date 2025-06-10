@@ -1,7 +1,9 @@
 package com.marsreg.document.dto;
 
+import com.marsreg.document.enums.DocumentStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class DocumentDTO {
@@ -10,13 +12,13 @@ public class DocumentDTO {
     private String originalName;
     private String contentType;
     private Long size;
-    private String storagePath;
-    private String bucket;
-    private String objectName;
-    private String md5;
-    private String status;
+    private String category;
+    private List<String> tags;
+    private DocumentStatus status;
     private String errorMessage;
-    private Integer version;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime processedTime;
+    private String createdBy;
+    private String updatedBy;
 } 

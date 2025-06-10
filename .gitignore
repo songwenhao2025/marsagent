@@ -36,6 +36,17 @@ build/
 *.log
 logs/
 
+### Environment ###
+.env
+.env.local
+.env.*.local
+
 ### System Files ###
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+### Project Specific ###
+/marsreg-document/index/
+/marsreg-document/test-index/
+/marsreg-search/index/
+/marsreg-search/test-index/ 

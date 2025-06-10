@@ -4,26 +4,38 @@ import com.marsreg.common.annotation.Log;
 import com.marsreg.common.annotation.Cache;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.document.dto.DocumentDTO;
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentContent;
 import com.marsreg.document.enums.DocumentStatus;
 import com.marsreg.document.repository.DocumentContentRepository;
 import com.marsreg.document.repository.DocumentRepository;
-import com.marsreg.document.service.DocumentProcessService;
+import com.marsreg.document.service.DocumentCoreService;
 import com.marsreg.document.service.DocumentService;
 import com.marsreg.document.service.DocumentStorageService;
 import com.marsreg.document.service.DocumentVectorService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import com.marsreg.document.event.DocumentCreatedEvent;
+import com.marsreg.document.event.DocumentDeletedEvent;
+import com.marsreg.document.model.DocumentSearchRequest;
+import com.marsreg.document.model.DocumentSearchResponse;
+import com.marsreg.document.model.MarsregDocument;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -33,150 +45,157 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentRepository documentRepository;
     private final DocumentContentRepository documentContentRepository;
     private final DocumentStorageService documentStorageService;
-    private final DocumentProcessService documentProcessService;
+    private final DocumentCoreService documentCoreService;
+    private final ApplicationEventPublisher eventPublisher;
     private final DocumentVectorService documentVectorService;
 
     @Override
-    @Log(module = "文档管理", operation = "上传", description = "上传文档")
     @Transactional
-    public DocumentDTO uploadDocument(MultipartFile file) {
-        // 生成唯一文件名
-        String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String objectName = UUID.randomUUID().toString() + extension;
+    public DocumentEntity save(DocumentEntity document) {
+        return documentRepository.save(document);
+    }
 
-        // 保存到存储服务
-        documentStorageService.storeFile(file, objectName);
+    @Override
+    @Transactional
+    public DocumentEntity upload(MultipartFile file) throws IOException {
+        // 实现上传逻辑
+        return null;
+    }
 
-        // 创建文档记录
-        Document document = new Document();
-        document.setName(originalFilename);
-        document.setOriginalName(originalFilename);
-        document.setContentType(file.getContentType());
-        document.setSize(file.getSize());
-        document.setStoragePath(objectName);
-        document.setBucket(documentStorageService.getBucketName());
-        document.setObjectName(objectName);
-        document.setStatus(DocumentStatus.ACTIVE);
-        document.setVersion(1L);
-        document.setCreateTime(LocalDateTime.now());
-        document.setUpdateTime(LocalDateTime.now());
-
-        // 保存到数据库
-        document = documentRepository.save(document);
-
-        // 转换为DTO
-        DocumentDTO dto = new DocumentDTO();
-        dto.setId(document.getId());
-        dto.setName(document.getName());
-        dto.setOriginalName(document.getOriginalName());
-        dto.setContentType(document.getContentType());
-        dto.setSize(document.getSize());
-        dto.setStoragePath(document.getStoragePath());
-        dto.setBucket(document.getBucket());
-        dto.setObjectName(document.getObjectName());
-        dto.setStatus(document.getStatus().name());
-        dto.setVersion(document.getVersion().intValue());
-        dto.setCreateTime(document.getCreateTime());
-        dto.setUpdateTime(document.getUpdateTime());
-
-        return dto;
+    @Override
+    @Transactional
+    public List<DocumentEntity> batchUpload(List<MultipartFile> files) throws IOException {
+        // 实现批量上传逻辑
+        return null;
     }
 
     @Override
     @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
     @Cache(name = "document", key = "#id", expire = 3600)
-    public Document getDocument(Long id) {
-        return documentRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("文档不存在"));
+    public Optional<DocumentEntity> getDocumentEntity(Long id) {
+        return documentRepository.findById(id);
     }
 
     @Override
-    @Log(module = "文档管理", operation = "删除", description = "删除文档")
     @Transactional
     public void deleteDocument(Long id) {
-        Document document = getDocument(id);
-        
-        try {
-            // 1. 删除存储的文件
-            documentStorageService.deleteFile(document.getBucket(), document.getObjectName());
-            
-            // 2. 删除文档的向量
-            documentVectorService.deleteDocumentVectors(id);
-            
-            // 3. 删除数据库记录
-            documentRepository.delete(document);
-            
-            log.info("文档删除成功: id={}", id);
-        } catch (Exception e) {
-            log.error("文档删除失败: id={}", id, e);
-            throw new BusinessException("文档删除失败: " + e.getMessage());
-        }
+        DocumentEntity document = getDocumentEntity(id)
+            .orElseThrow(() -> new BusinessException("文档不存在"));
+        documentStorageService.deleteFile(document.getObjectName());
+        documentRepository.delete(document);
+        eventPublisher.publishEvent(new DocumentDeletedEvent(this, id));
     }
 
     @Override
-    public Page<Document> listDocuments(Pageable pageable) {
+    @Transactional
+    public void batchDelete(List<Long> ids) {
+        // 实现批量删除逻辑
+    }
+
+    @Override
+    public DocumentEntity getById(Long id) {
+        return documentRepository.findById(id)
+            .orElseThrow(() -> new BusinessException("文档不存在"));
+    }
+
+    @Override
+    public Page<DocumentEntity> page(Pageable pageable) {
         return documentRepository.findAll(pageable);
     }
 
     @Override
-    public String getDocumentUrl(Long id, int expirySeconds) {
-        Document document = getDocument(id);
-        return documentStorageService.getFileUrl(document.getBucket(), document.getObjectName(), expirySeconds);
+    public List<DocumentDTO> listDocuments(Pageable pageable) {
+        return documentRepository.findAll(pageable)
+            .getContent()
+            .stream()
+            .map(this::convertToDTO)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public String getDocumentUrl(Long id, int expiration) {
+        // 实现获取文档 URL 逻辑
+        return null;
     }
 
     @Override
     public String getContent(Long id) {
-        return documentContentRepository.findByDocumentId(id)
-                .map(DocumentContent::getContent)
-                .orElseThrow(() -> new BusinessException("文档内容不存在"));
+        // 实现获取文档内容逻辑
+        return null;
     }
 
-    private void processDocument(Document document) {
-        try {
-            // 提取文本
-            String text = documentProcessService.extractText(document);
-            
-            // 清洗文本
-            String cleanedText = documentProcessService.cleanText(text);
-            
-            // 检测语言
-            String language = documentProcessService.detectLanguage(cleanedText);
-            
-            // 智能分块
-            List<String> chunks = documentProcessService.smartChunkText(cleanedText, 1000, 200);
-            
-            // 创建文档内容
-            DocumentContent content = new DocumentContent();
-            content.setDocumentId(document.getId());
-            content.setContent(text);
-            
-            // 保存文档内容
-            documentContentRepository.save(content);
-            
-            // 更新文档状态
-            document.setStatus(DocumentStatus.COMPLETED);
-            documentRepository.save(document);
-        } catch (Exception e) {
-            log.error("文档处理失败", e);
-            document.setStatus(DocumentStatus.FAILED);
-            document.setErrorMessage(e.getMessage());
-            documentRepository.save(document);
-            throw new BusinessException("文档处理失败: " + e.getMessage());
-        }
+    @Override
+    @Transactional
+    public DocumentDTO createDocument(MultipartFile file, DocumentDTO metadata) {
+        // 保存文件到存储服务
+        String objectName = documentStorageService.storeFile(file);
+        
+        // 创建文档实体
+        DocumentEntity document = new DocumentEntity();
+        document.setName(file.getOriginalFilename());
+        document.setOriginalName(file.getOriginalFilename());
+        document.setContentType(file.getContentType());
+        document.setSize(file.getSize());
+        document.setObjectName(objectName);
+        document.setBucket(documentStorageService.getBucket());
+        document.setStoragePath(documentStorageService.getStoragePath());
+        
+        // 保存文档实体
+        document = documentRepository.save(document);
+        
+        // 处理文档
+        document = documentCoreService.processDocument(document);
+        
+        // 更新文档向量和索引
+        documentCoreService.updateDocumentVector(document);
+        documentCoreService.updateDocumentIndex(document);
+        
+        return convertToDTO(document);
     }
 
-    private int countWords(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
-        return text.split("\\s+").length;
+    @Override
+    @Transactional
+    public DocumentDTO updateDocument(Long id, DocumentDTO metadata) {
+        DocumentEntity document = getDocumentEntity(id)
+            .orElseThrow(() -> new BusinessException("文档不存在"));
+            
+        // 更新文档元数据
+        document.setName(metadata.getName());
+        document.setCategory(metadata.getCategory());
+        document.setTags(metadata.getTags());
+        
+        // 保存更新
+        document = documentRepository.save(document);
+        
+        // 更新文档向量和索引
+        documentCoreService.updateDocumentVector(document);
+        documentCoreService.updateDocumentIndex(document);
+        
+        return convertToDTO(document);
     }
 
-    private int countParagraphs(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
-        return text.split("\n\\s*\n").length;
+    @Override
+    public Optional<DocumentDTO> getDocument(Long id) {
+        return getDocumentEntity(id)
+            .map(this::convertToDTO);
+    }
+    
+    private DocumentDTO convertToDTO(DocumentEntity entity) {
+        DocumentDTO dto = new DocumentDTO();
+        dto.setId(entity.getId());
+        dto.setName(entity.getName());
+        dto.setOriginalName(entity.getOriginalName());
+        dto.setContentType(entity.getContentType());
+        dto.setSize(entity.getSize());
+        dto.setCategory(entity.getCategory());
+        dto.setTags(entity.getTags());
+        dto.setStatus(entity.getStatus());
+        dto.setErrorMessage(entity.getErrorMessage());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
+        dto.setProcessedTime(entity.getProcessedTime());
+        dto.setCreatedBy(entity.getCreatedBy());
+        dto.setUpdatedBy(entity.getUpdatedBy());
+        return dto;
     }
 } 

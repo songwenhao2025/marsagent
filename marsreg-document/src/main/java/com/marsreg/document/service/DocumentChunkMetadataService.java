@@ -95,4 +95,8 @@ public interface DocumentChunkMetadataService {
      * @param key 键
      */
     void deleteByDocumentIdAndKey(Long documentId, String key);
+
+    void saveMetadata(Long chunkId, String key, String value, String type, String description);
+
+    List<DocumentChunkMetadata> findByChunkId(Long chunkId);
 } 

@@ -641,6 +641,60 @@ public interface ExportTaskService {
     Map<String, Object> getChunkPerformanceComparison(String taskId, int chunkIndex, 
         String compareTaskId, int compareChunkIndex);
     
+    /**
+     * 获取线程池指标
+     * @return 线程池指标信息
+     */
+    Map<String, Object> getThreadPoolMetrics();
+    
+    /**
+     * 获取批量任务进度
+     * @param batchId 批量任务ID
+     * @return 批量任务进度信息
+     */
+    Map<String, Object> getBatchProgress(String batchId);
+
+    /**
+     * 获取任务分片进度
+     * @param taskId 任务ID
+     * @return 分片进度信息
+     */
+    Map<String, Object> getChunkProgress(String taskId);
+
+    /**
+     * 获取指定时间范围内的分片日志
+     * @param taskId 任务ID
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 分片日志信息
+     */
+    Map<String, Object> getChunkLogsByTimeRange(String taskId, long startTime, long endTime);
+
+    /**
+     * 获取任务分片日志
+     * @param taskId 任务ID
+     * @return 分片日志信息
+     */
+    Map<String, Object> getChunkLogs(String taskId);
+
+    /**
+     * 获取指定事件类型的分片日志
+     * @param taskId 任务ID
+     * @param event 事件类型
+     * @return 分片日志信息
+     */
+    Map<String, Object> getChunkLogsByEvent(String taskId, String event);
+
+    /**
+     * 处理数据分片
+     * @param taskId 任务ID
+     * @param taskType 任务类型
+     * @param params 任务参数
+     * @param chunkIndex 分片索引
+     * @return 处理结果
+     */
+    Map<String, Object> processDataChunk(String taskId, ExportTaskType taskType, ExportTaskParams params, Integer chunkIndex);
+    
     enum ExportTaskType {
         SEARCH_STATISTICS,
         USER_BEHAVIOR,

@@ -4,9 +4,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.elasticsearch.client.ClientConfiguration;
-import org.springframework.data.elasticsearch.client.RestClients;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchConfiguration;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -15,28 +14,31 @@ import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration
 @EnableElasticsearchRepositories(basePackages = "com.marsreg.search.repository")
-public class IntegrationTestConfig {
+public class IntegrationTestConfig extends ElasticsearchConfiguration {
 
     private static final ElasticsearchContainer elasticsearchContainer;
 
     static {
         elasticsearchContainer = new ElasticsearchContainer(
-            DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:7.17.0")
+            DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:8.11.1")
+                .asCompatibleSubstituteFor("elasticsearch")
         );
+        elasticsearchContainer.withExposedPorts(9200);
+        elasticsearchContainer.withEnv("discovery.type", "single-node");
+        elasticsearchContainer.withEnv("xpack.security.enabled", "false");
         elasticsearchContainer.start();
     }
 
     @DynamicPropertySource
     static void elasticsearchProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.elasticsearch.rest.uris", elasticsearchContainer::getHttpHostAddress);
+        registry.add("spring.elasticsearch.uris", () -> 
+            "http://" + elasticsearchContainer.getHost() + ":" + elasticsearchContainer.getMappedPort(9200));
     }
 
-    @Bean
-    @Primary
-    public ElasticsearchOperations elasticsearchOperations() {
-        ClientConfiguration clientConfiguration = ClientConfiguration.builder()
-            .connectedTo(elasticsearchContainer.getHttpHostAddress())
+    @Override
+    public ClientConfiguration clientConfiguration() {
+        return ClientConfiguration.builder()
+            .connectedTo(elasticsearchContainer.getHost() + ":" + elasticsearchContainer.getMappedPort(9200))
             .build();
-        return new ElasticsearchRestTemplate(RestClients.create(clientConfiguration).rest());
     }
 } 

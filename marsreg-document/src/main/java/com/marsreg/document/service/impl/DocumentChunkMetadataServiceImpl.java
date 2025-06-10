@@ -107,6 +107,22 @@ public class DocumentChunkMetadataServiceImpl implements DocumentChunkMetadataSe
         metadataRepository.deleteByDocumentIdAndKey(documentId, key);
     }
 
+    @Override
+    public void saveMetadata(Long chunkId, String key, String value, String type, String description) {
+        DocumentChunkMetadata metadata = new DocumentChunkMetadata();
+        metadata.setChunkId(chunkId);
+        metadata.setKey(key);
+        metadata.setValue(value);
+        metadata.setType(type);
+        metadata.setDescription(description);
+        metadataRepository.save(metadata);
+    }
+
+    @Override
+    public List<DocumentChunkMetadata> findByChunkId(Long chunkId) {
+        return metadataRepository.findByChunkId(chunkId);
+    }
+
     /**
      * 将元数据列表转换为Map
      */

@@ -1,13 +1,10 @@
 package com.marsreg.search.service;
 
-import com.marsreg.document.model.Document;
-import com.marsreg.document.service.DocumentService;
 import com.marsreg.search.cache.SearchCacheKeyGenerator;
 import com.marsreg.search.config.TestConfig;
 import com.marsreg.search.model.DocumentIndex;
 import com.marsreg.search.model.SearchRequest;
-import com.marsreg.search.model.SearchResult;
-import com.marsreg.search.model.SearchType;
+import com.marsreg.search.model.SearchResponse;
 import com.marsreg.search.repository.DocumentIndexRepository;
 import com.marsreg.search.service.impl.SearchServiceImpl;
 import com.marsreg.vector.service.VectorizationService;
@@ -22,9 +19,9 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,9 +41,6 @@ public class SearchServiceTest {
 
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
-
-    @MockBean
-    private DocumentService documentService;
 
     @MockBean
     private VectorizationService vectorizationService;
@@ -69,72 +63,88 @@ public class SearchServiceTest {
         // 清空文档索引
         documentIndexRepository.deleteAll();
         
-        // 设置文档服务模拟行为
-        Document testDocument = Document.builder()
-            .id(TEST_DOC_ID)
-            .title("测试文档")
-            .content("这是一个测试文档的内容")
-            .build();
-        when(documentService.getDocument(TEST_DOC_ID)).thenReturn(Optional.of(testDocument));
-        
         // 设置向量化服务模拟行为
         when(vectorizationService.vectorize(anyString())).thenReturn(TEST_VECTOR);
         
         // 设置向量存储服务模拟行为
-        when(vectorStorageService.search(any(), anyInt(), anyFloat()))
-            .thenReturn(List.of(Map.entry(TEST_DOC_ID, 0.8f)));
+        Map<String, Float> searchResults = new HashMap<>();
+        searchResults.put(TEST_DOC_ID, 0.8f);
+        when(vectorStorageService.searchSimilar(any(), anyInt(), anyFloat()))
+            .thenReturn(searchResults);
         
         // 创建测试文档索引
-        DocumentIndex index = new DocumentIndex();
-        index.setId(TEST_DOC_ID);
-        index.setDocumentId(TEST_DOC_ID);
-        index.setTitle("测试文档");
-        index.setContent("这是一个测试文档的内容");
+        DocumentIndex index = DocumentIndex.builder()
+            .id(TEST_DOC_ID)
+            .documentId(TEST_DOC_ID)
+            .title("测试文档")
+            .content("这是一个测试文档的内容")
+            .build();
         documentIndexRepository.save(index);
     }
 
     @Test
     void testVectorSearch() {
+        // 创建检索请求
+        SearchRequest request = SearchRequest.builder()
+            .query(TEST_QUERY)
+            .searchType(SearchRequest.SearchType.VECTOR)
+            .size(10)
+            .minScore(0.5f)
+            .build();
+            
         // 执行向量检索
-        List<SearchResult> results = searchService.vectorSearch(TEST_QUERY, 10, 0.5f);
+        SearchResponse response = searchService.search(request);
         
         // 验证结果
-        assertNotNull(results);
-        assertFalse(results.isEmpty());
-        assertEquals(TEST_DOC_ID, results.get(0).getDocumentId());
-        assertEquals(0.8f, results.get(0).getScore());
+        assertNotNull(response);
+        assertFalse(response.getResults().isEmpty());
+        assertEquals(TEST_DOC_ID, response.getResults().get(0).getId());
+        assertEquals(0.8f, response.getResults().get(0).getScore());
         
         // 验证服务调用
         verify(vectorizationService).vectorize(TEST_QUERY);
-        verify(vectorStorageService).search(TEST_VECTOR, 10, 0.5f);
-        verify(documentService).getDocument(TEST_DOC_ID);
+        verify(vectorStorageService).searchSimilar(TEST_VECTOR, 10, 0.5f);
     }
 
     @Test
     void testKeywordSearch() {
+        // 创建检索请求
+        SearchRequest request = SearchRequest.builder()
+            .query(TEST_QUERY)
+            .searchType(SearchRequest.SearchType.KEYWORD)
+            .size(10)
+            .build();
+            
         // 执行关键词检索
-        List<SearchResult> results = searchService.keywordSearch(TEST_QUERY, 10);
+        SearchResponse response = searchService.search(request);
         
         // 验证结果
-        assertNotNull(results);
-        assertFalse(results.isEmpty());
-        assertEquals(TEST_DOC_ID, results.get(0).getDocumentId());
+        assertNotNull(response);
+        assertFalse(response.getResults().isEmpty());
+        assertEquals(TEST_DOC_ID, response.getResults().get(0).getId());
     }
 
     @Test
     void testHybridSearch() {
+        // 创建检索请求
+        SearchRequest request = SearchRequest.builder()
+            .query(TEST_QUERY)
+            .searchType(SearchRequest.SearchType.HYBRID)
+            .size(10)
+            .minScore(0.5f)
+            .build();
+            
         // 执行混合检索
-        List<SearchResult> results = searchService.hybridSearch(TEST_QUERY, 10, 0.5f);
+        SearchResponse response = searchService.search(request);
         
         // 验证结果
-        assertNotNull(results);
-        assertFalse(results.isEmpty());
-        assertEquals(TEST_DOC_ID, results.get(0).getDocumentId());
+        assertNotNull(response);
+        assertFalse(response.getResults().isEmpty());
+        assertEquals(TEST_DOC_ID, response.getResults().get(0).getId());
         
         // 验证服务调用
         verify(vectorizationService).vectorize(TEST_QUERY);
-        verify(vectorStorageService).search(TEST_VECTOR, 10, 0.5f);
-        verify(documentService).getDocument(TEST_DOC_ID);
+        verify(vectorStorageService).searchSimilar(TEST_VECTOR, 10, 0.5f);
     }
 
     @Test
@@ -142,17 +152,17 @@ public class SearchServiceTest {
         // 创建检索请求
         SearchRequest request = SearchRequest.builder()
             .query(TEST_QUERY)
-            .searchType(SearchType.VECTOR)
+            .searchType(SearchRequest.SearchType.VECTOR)
             .size(10)
-            .minSimilarity(0.5f)
+            .minScore(0.5f)
             .build();
         
         // 执行检索
-        List<SearchResult> results = searchService.search(request);
+        SearchResponse response = searchService.search(request);
         
         // 验证结果
-        assertNotNull(results);
-        assertFalse(results.isEmpty());
-        assertEquals(TEST_DOC_ID, results.get(0).getDocumentId());
+        assertNotNull(response);
+        assertFalse(response.getResults().isEmpty());
+        assertEquals(TEST_DOC_ID, response.getResults().get(0).getId());
     }
 } 

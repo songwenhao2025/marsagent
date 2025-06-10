@@ -5,7 +5,7 @@ import com.marsreg.common.annotation.Log;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.vector.cache.VectorCacheManager;
 import com.marsreg.vector.config.VectorizationConfig;
-import com.marsreg.vector.model.VectorizationModel;
+import com.marsreg.vector.model.SentenceTransformerModel;
 import com.marsreg.vector.service.VectorizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,96 +23,61 @@ public class VectorizationServiceImpl implements VectorizationService {
 
     private final VectorizationConfig config;
     private final ExecutorService vectorizationExecutor;
-    private final VectorizationModel model;
+    private final SentenceTransformerModel model;
     private final VectorCacheManager cacheManager;
     
     private static final int BATCH_SIZE = 32; // 批处理大小
     
     @Override
     @Log(module = "向量化", operation = "向量化", description = "文本向量化")
-    public List<Float> vectorize(String text) {
-        try {
-            return model.vectorize(text);
-        } catch (Exception e) {
-            log.error("文本向量化失败", e);
-            throw new BusinessException("文本向量化失败: " + e.getMessage());
+    public float[] vectorize(String text) {
+        float[] vector = cacheManager.getVector(text);
+        if (vector != null) {
+            return vector;
         }
+        vector = model.encode(text);
+        cacheManager.put(text, vector);
+        return vector;
     }
     
     @Override
     @Log(module = "向量化", operation = "批量向量化", description = "批量文本向量化")
-    public List<List<Float>> batchVectorize(List<String> texts) {
-        try {
-            // 如果文本数量小于批处理大小，直接处理
-            if (texts.size() <= BATCH_SIZE) {
-                return model.batchVectorize(texts);
-            }
-            
-            // 将文本列表分成多个批次
-            List<List<String>> batches = new ArrayList<>();
-            for (int i = 0; i < texts.size(); i += BATCH_SIZE) {
-                batches.add(texts.subList(i, Math.min(i + BATCH_SIZE, texts.size())));
-            }
-            
-            // 并行处理每个批次
-            List<CompletableFuture<List<List<Float>>>> futures = batches.stream()
-                .map(batch -> CompletableFuture.supplyAsync(() -> model.batchVectorize(batch), vectorizationExecutor))
-                .collect(Collectors.toList());
-            
-            // 等待所有批次处理完成并合并结果
-            return futures.stream()
-                .map(CompletableFuture::join)
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("批量文本向量化失败", e);
-            throw new BusinessException("批量文本向量化失败: " + e.getMessage());
-        }
+    public List<float[]> batchVectorize(List<String> texts) {
+        return model.encode(texts).stream()
+            .map(this::normalize)
+            .collect(Collectors.toList());
     }
     
     @Override
     @Log(module = "向量化", operation = "缓存向量化", description = "带缓存的文本向量化")
     @Cache(name = "vector", key = "#text", expire = 3600)
-    public List<Float> vectorizeWithCache(String text) {
+    public float[] vectorizeWithCache(String text) {
         String cacheKey = String.valueOf(text.hashCode());
-        
-        // 尝试从缓存获取
-        List<Float> cachedVector = cacheManager.get(cacheKey);
+        float[] cachedVector = cacheManager.getVector(cacheKey);
         if (cachedVector != null) {
             return cachedVector;
         }
-        
-        // 缓存未命中，进行向量化
-        List<Float> vector = vectorize(text);
-        
-        // 存入缓存
+        float[] vector = vectorize(text);
         cacheManager.put(cacheKey, vector);
-        
         return vector;
     }
     
     @Override
     @Log(module = "向量化", operation = "批量缓存向量化", description = "带缓存的批量文本向量化")
-    public List<List<Float>> batchVectorizeWithCache(List<String> texts) {
-        // 生成缓存键
+    public List<float[]> batchVectorizeWithCache(List<String> texts) {
         Map<String, String> textToKey = texts.stream()
             .collect(Collectors.toMap(
                 text -> text,
                 text -> String.valueOf(text.hashCode())
             ));
-        
-        // 批量获取缓存
-        Map<String, List<Float>> cachedVectors = cacheManager.batchGet(
-            textToKey.values().stream().collect(Collectors.toList())
+        Map<String, float[]> cachedVectors = cacheManager.batchGet(
+            new ArrayList<>(textToKey.values())
         );
-        
-        // 找出缓存未命中的文本
         List<String> textsToVectorize = new ArrayList<>();
-        List<List<Float>> result = new ArrayList<>();
-        
+        List<float[]> result = new ArrayList<>();
         for (String text : texts) {
             String cacheKey = textToKey.get(text);
-            List<Float> cachedVector = cachedVectors.get(cacheKey);
+            float[] cachedVector = cachedVectors.get(cacheKey);
             if (cachedVector != null) {
                 result.add(cachedVector);
             } else {
@@ -120,25 +85,19 @@ public class VectorizationServiceImpl implements VectorizationService {
                 result.add(null);
             }
         }
-        
-        // 对未命中的文本进行向量化
         if (!textsToVectorize.isEmpty()) {
-            List<List<Float>> newVectors = batchVectorize(textsToVectorize);
-            
-            // 更新缓存
-            Map<String, List<Float>> newCacheEntries = new HashMap<>();
+            List<float[]> newVectors = batchVectorize(textsToVectorize);
+            Map<String, float[]> newCacheEntries = new HashMap<>();
             int newVectorIndex = 0;
             for (int i = 0; i < result.size(); i++) {
                 if (result.get(i) == null) {
-                    List<Float> vector = newVectors.get(newVectorIndex++);
+                    float[] vector = newVectors.get(newVectorIndex++);
                     result.set(i, vector);
                     newCacheEntries.put(textToKey.get(texts.get(i)), vector);
                 }
             }
-            
             cacheManager.batchPut(newCacheEntries);
         }
-        
         return result;
     }
     
@@ -177,5 +136,58 @@ public class VectorizationServiceImpl implements VectorizationService {
             log.error("向量化模型预热失败", e);
             throw new BusinessException("向量化模型预热失败: " + e.getMessage());
         }
+    }
+
+    public float[] normalize(float[] vector) {
+        if (vector == null || vector.length == 0) {
+            return vector;
+        }
+        float sum = 0;
+        for (float v : vector) {
+            sum += v * v;
+        }
+        float norm = (float) Math.sqrt(sum);
+        if (norm > 0) {
+            for (int i = 0; i < vector.length; i++) {
+                vector[i] /= norm;
+            }
+        }
+        return vector;
+    }
+
+    @Override
+    public int getDimension() {
+        return model.getDimension();
+    }
+
+    public CompletableFuture<List<float[]>> batchVectorizeAsync(List<String> texts) {
+        return CompletableFuture.supplyAsync(() -> batchVectorize(texts), vectorizationExecutor);
+    }
+
+    public float calculateSimilarity(float[] vector1, float[] vector2) {
+        if (vector1 == null || vector2 == null || vector1.length != vector2.length) {
+            throw new IllegalArgumentException("向量维度不一致或为空");
+        }
+        float dot = 0, norm1 = 0, norm2 = 0;
+        for (int i = 0; i < vector1.length; i++) {
+            dot += vector1[i] * vector2[i];
+            norm1 += vector1[i] * vector1[i];
+            norm2 += vector2[i] * vector2[i];
+        }
+        return (float) (dot / (Math.sqrt(norm1) * Math.sqrt(norm2)));
+    }
+
+    @Override
+    public List<List<Float>> calculateSimilarityMatrix(List<float[]> vectors) {
+        int n = vectors.size();
+        List<List<Float>> matrix = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            List<Float> row = new ArrayList<>(n);
+            for (int j = 0; j < n; j++) {
+                row.add(calculateSimilarity(vectors.get(i), vectors.get(j)));
+            }
+            matrix.add(row);
+        }
+        return matrix;
     }
 } 

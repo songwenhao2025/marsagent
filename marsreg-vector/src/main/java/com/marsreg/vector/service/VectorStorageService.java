@@ -5,53 +5,60 @@ import java.util.Map;
 
 public interface VectorStorageService {
     /**
-     * 存储单个向量
+     * 存储向量
      * @param id 向量ID
      * @param vector 向量数据
      */
-    void store(String id, float[] vector);
+    void storeVector(String id, float[] vector);
 
     /**
      * 批量存储向量
-     * @param vectors 向量ID到向量数据的映射
+     * @param vectors 向量ID和数据的映射
      */
-    void batchStore(Map<String, float[]> vectors);
+    void storeVectors(Map<String, float[]> vectors);
 
     /**
-     * 更新向量
+     * 获取向量
      * @param id 向量ID
-     * @param vector 新的向量数据
+     * @return 向量数据
      */
-    void updateVector(String id, float[] vector);
+    float[] getVector(String id);
+
+    /**
+     * 批量获取向量
+     * @param ids 向量ID列表
+     * @return 向量ID和数据的映射
+     */
+    Map<String, float[]> getVectors(List<String> ids);
 
     /**
      * 删除向量
      * @param id 向量ID
      */
-    void delete(String id);
+    void deleteVector(String id);
 
     /**
-     * 根据前缀删除向量
-     * @param prefix 向量ID前缀
+     * 批量删除向量
+     * @param ids 向量ID列表
      */
-    void deleteByPrefix(String prefix);
+    void deleteVectors(List<String> ids);
 
     /**
      * 搜索相似向量
      * @param queryVector 查询向量
      * @param limit 返回结果数量限制
      * @param minScore 最小相似度分数
-     * @return 搜索结果列表，每个结果包含向量ID和相似度分数
+     * @return 相似向量ID和分数的映射
      */
-    List<Map.Entry<String, Float>> search(float[] queryVector, int limit, float minScore);
+    Map<String, Float> searchSimilar(float[] queryVector, int limit, float minScore);
 
     /**
-     * 在指定前缀范围内搜索相似向量
+     * 在指定范围内搜索相似向量
      * @param queryVector 查询向量
-     * @param prefix 向量ID前缀
+     * @param vectorIds 向量ID范围
      * @param limit 返回结果数量限制
      * @param minScore 最小相似度分数
-     * @return 搜索结果列表，每个结果包含向量ID和相似度分数
+     * @return 相似向量ID和分数的映射
      */
-    List<Map.Entry<String, Float>> searchByPrefix(float[] queryVector, String prefix, int limit, float minScore);
+    Map<String, Float> searchSimilarInRange(float[] queryVector, List<String> vectorIds, int limit, float minScore);
 } 

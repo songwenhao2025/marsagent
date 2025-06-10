@@ -1,5 +1,6 @@
 package com.marsreg.search.service;
 
+import com.marsreg.search.model.SearchResult;
 import java.util.List;
 import java.util.Map;
 
@@ -19,4 +20,21 @@ public interface SearchHighlightService {
      * @return 高亮片段列表
      */
     List<String> extractHighlightFragments(String content, Map<String, String[]> highlights);
+    
+    /**
+     * 处理搜索结果的高亮和摘要
+     * @param results 搜索结果列表
+     * @param query 搜索查询
+     * @return 处理后的搜索结果列表
+     */
+    List<SearchResult> processHighlights(List<SearchResult> results, String query);
+    
+    /**
+     * 生成摘要
+     * @param content 原始内容
+     * @param query 搜索查询
+     * @param maxLength 最大长度
+     * @return 生成的摘要
+     */
+    String generateSummary(String content, String query, int maxLength);
 } 

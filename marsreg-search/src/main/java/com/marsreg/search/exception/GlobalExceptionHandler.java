@@ -1,0 +1,49 @@
+package com.marsreg.search.exception;
+
+import lombok.Data;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+import java.time.LocalDateTime;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @Data
+    public static class ErrorResponse {
+        private final LocalDateTime timestamp;
+        private final String errorCode;
+        private final String message;
+        private final String path;
+
+        public ErrorResponse(String errorCode, String message, String path) {
+            this.timestamp = LocalDateTime.now();
+            this.errorCode = errorCode;
+            this.message = message;
+            this.path = path;
+        }
+    }
+
+    @ExceptionHandler(SearchException.class)
+    public ResponseEntity<ErrorResponse> handleSearchException(SearchException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+            ex.getErrorCode(),
+            ex.getErrorMessage(),
+            request.getDescription(false)
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+            "INTERNAL_ERROR",
+            "服务器内部错误",
+            request.getDescription(false)
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+} 

@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
         ErrorResponse errorResponse = new ErrorResponse(
-            ErrorCode.INTERNAL_ERROR.getCode(),
+            String.valueOf(ErrorCode.INTERNAL_ERROR.getCode()),
             ErrorCode.INTERNAL_ERROR.getMessage(),
             request.getDescription(false)
         );

@@ -1,13 +1,13 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
+    url: jdbc:mysql://rm-bp122j6l43ik18389bo.mysql.rds.aliyuncs.com:3306/mars_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: marsdb_2025
+    password: Mars2025
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
 
 vector:
@@ -32,4 +32,55 @@ document:
     path: test-storage
   chunking:
     max-size: 1000
-    overlap: 100 
+    overlap: 100
+
+marsreg:
+  document:
+    rate-limit:
+      default:
+        limit: 100
+        time-window: 60
+      upload:
+        limit: 10
+        time-window: 60
+      download:
+        limit: 50
+        time-window: 60
+    upload:
+      part-size: 5242880  # 5MB
+      max-file-size: 104857600  # 100MB
+      allowed-types:
+        - application/pdf
+        - application/msword
+        - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        - text/plain
+        - image/jpeg
+        - image/png
+    chunking:
+      default-max-chunk-size: 1000
+      default-min-chunk-size: 100
+      default-overlap-size: 50
+      enable-smart-chunking: true
+      split-on-sentence-boundary: true
+    alert:
+      upload-failure-threshold: 0.1
+      upload-time-threshold: 5000
+      check-interval: 300000
+
+aliyun:
+  oss:
+    endpoint: oss-test.aliyuncs.com
+    accessKeyId: test-key
+    accessKeySecret: test-secret
+    bucketName: test-bucket
+    urlExpiration: 3600
+
+milvus:
+  host: localhost
+  port: 19530
+  collection: test_collection
+  dimension: 1536
+  index-type: IVF_FLAT
+  metric-type: L2
+  nlist: 1024
+  nprobe: 10 

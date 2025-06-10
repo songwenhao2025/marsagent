@@ -1,53 +1,31 @@
 package com.marsreg.search.listener;
 
-import com.marsreg.document.event.DocumentCreatedEvent;
-import com.marsreg.document.event.DocumentDeletedEvent;
-import com.marsreg.document.event.DocumentUpdatedEvent;
-import com.marsreg.document.model.Document;
+import com.marsreg.common.event.DocumentCreatedEvent;
+import com.marsreg.common.event.DocumentUpdatedEvent;
+import com.marsreg.common.event.DocumentDeletedEvent;
 import com.marsreg.search.service.DocumentIndexSyncService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component
-@RequiredArgsConstructor
 public class DocumentEventListener {
+    
+    @Autowired
+    private DocumentIndexSyncService documentIndexSyncService;
 
-    private final DocumentIndexSyncService documentIndexSyncService;
-
-    @Async
     @EventListener
-    public void handleDocumentCreatedEvent(DocumentCreatedEvent event) {
-        try {
-            log.info("Handling document created event: {}", event.getDocument().getId());
-            documentIndexSyncService.syncDocument(event.getDocument());
-        } catch (Exception e) {
-            log.error("Failed to handle document created event: " + event.getDocument().getId(), e);
-        }
+    public void handleDocumentCreated(DocumentCreatedEvent event) {
+        documentIndexSyncService.indexDocument(event.getDocument());
     }
 
-    @Async
     @EventListener
-    public void handleDocumentUpdatedEvent(DocumentUpdatedEvent event) {
-        try {
-            log.info("Handling document updated event: {}", event.getDocument().getId());
-            documentIndexSyncService.syncDocument(event.getDocument());
-        } catch (Exception e) {
-            log.error("Failed to handle document updated event: " + event.getDocument().getId(), e);
-        }
+    public void handleDocumentUpdated(DocumentUpdatedEvent event) {
+        documentIndexSyncService.updateDocument(event.getNewDocument());
     }
 
-    @Async
     @EventListener
-    public void handleDocumentDeletedEvent(DocumentDeletedEvent event) {
-        try {
-            log.info("Handling document deleted event: {}", event.getDocumentId());
-            documentIndexSyncService.deleteDocument(event.getDocumentId());
-        } catch (Exception e) {
-            log.error("Failed to handle document deleted event: " + event.getDocumentId(), e);
-        }
+    public void handleDocumentDeleted(DocumentDeletedEvent event) {
+        documentIndexSyncService.deleteDocument(event.getDocument().getId());
     }
 } 

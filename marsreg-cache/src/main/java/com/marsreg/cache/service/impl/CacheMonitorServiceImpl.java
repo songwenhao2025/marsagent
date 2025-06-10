@@ -145,6 +145,98 @@ public class CacheMonitorServiceImpl implements CacheMonitorService {
         log.info("重置缓存监控数据");
     }
 
+    @Override
+    public Long getCacheExpire(String key) {
+        try {
+            Long expire = redisTemplate.getExpire(key);
+            return expire != null ? expire : -1L;
+        } catch (Exception e) {
+            log.error("获取缓存过期时间失败, key: {}", key, e);
+            return -1L;
+        }
+    }
+
+    @Override
+    public Long getCacheSize(String type) {
+        try {
+            if (type == null || type.isEmpty()) {
+                return 0L;
+            }
+            Map<String, Long> sizeStats = cacheStatsService.getSizeStats();
+            switch (type.toLowerCase()) {
+                case "local":
+                    return sizeStats.getOrDefault("local", 0L);
+                case "distributed":
+                    Set<String> keys = redisTemplate.keys("*");
+                    return keys != null ? (long) keys.size() : 0L;
+                case "multilevel":
+                    long local = sizeStats.getOrDefault("local", 0L);
+                    Set<String> dkeys = redisTemplate.keys("*");
+                    long distributed = dkeys != null ? dkeys.size() : 0L;
+                    return local + distributed;
+                default:
+                    return 0L;
+            }
+        } catch (Exception e) {
+            log.error("获取缓存大小失败, type: {}", type, e);
+            return 0L;
+        }
+    }
+
+    @Override
+    public Map<String, Long> getCacheMemoryUsage() {
+        Map<String, Long> memoryUsage = new HashMap<>();
+        
+        // 获取本地缓存内存使用情况
+        if (cacheConfig.getLocal().isEnabled()) {
+            long localMemoryUsage = getLocalCacheMemoryUsage();
+            memoryUsage.put("local", localMemoryUsage);
+        }
+        
+        // 获取分布式缓存内存使用情况
+        if (cacheConfig.getDistributed().isEnabled()) {
+            long distributedMemoryUsage = getDistributedCacheMemoryUsage();
+            memoryUsage.put("distributed", distributedMemoryUsage);
+        }
+        
+        // 获取多级缓存内存使用情况
+        if (cacheConfig.getMultiLevel().isEnabled()) {
+            long multiLevelMemoryUsage = getMultiLevelCacheMemoryUsage();
+            memoryUsage.put("multiLevel", multiLevelMemoryUsage);
+        }
+        
+        return memoryUsage;
+    }
+    
+    private long getLocalCacheMemoryUsage() {
+        try {
+            // 使用JVM内存管理API获取本地缓存内存使用情况
+            Runtime runtime = Runtime.getRuntime();
+            long usedMemory = runtime.totalMemory() - runtime.freeMemory();
+            return usedMemory;
+        } catch (Exception e) {
+            log.error("获取本地缓存内存使用情况失败", e);
+            return 0L;
+        }
+    }
+    
+    private long getDistributedCacheMemoryUsage() {
+        try {
+            // 使用Redis INFO命令获取内存使用情况
+            Properties info = redisTemplate.getConnectionFactory().getConnection().info();
+            String usedMemory = info.getProperty("used_memory");
+            return usedMemory != null ? Long.parseLong(usedMemory) : 0L;
+        } catch (Exception e) {
+            log.error("获取分布式缓存内存使用情况失败", e);
+            return 0L;
+        }
+    }
+    
+    private long getMultiLevelCacheMemoryUsage() {
+        // 多级缓存内存使用情况为本地缓存和分布式缓存的总和
+        return getLocalCacheMemoryUsage() + getDistributedCacheMemoryUsage();
+    }
+
     private boolean checkRedisConnection() {
         try {
             redisTemplate.getConnectionFactory().getConnection().ping();
@@ -165,5 +257,98 @@ public class CacheMonitorServiceImpl implements CacheMonitorService {
         alerts.add(alert);
         
         log.error("缓存错误 - 类型: {}, 错误: {}", type, error);
+    }
+
+    @Override
+    public Double getCacheHitRate(String type) {
+        CacheStatsService.CacheStats stats = cacheStatsService.getStats(type);
+        return stats.getHitRate();
+    }
+
+    @Override
+    public Object getCacheValue(String key) {
+        try {
+            return redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            log.error("获取缓存值失败, key: {}", key, e);
+            return null;
+        }
+    }
+
+    @Override
+    public List<String> getCacheKeys(String type) {
+        try {
+            Set<String> keys = redisTemplate.keys(type + ":*");
+            return keys != null ? new ArrayList<>(keys) : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("获取缓存键列表失败, type: {}", type, e);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public List<String> getCacheTypes() {
+        List<String> types = new ArrayList<>();
+        if (cacheConfig.getLocal().isEnabled()) {
+            types.add("local");
+        }
+        if (cacheConfig.getDistributed().isEnabled()) {
+            types.add("distributed");
+        }
+        if (cacheConfig.getMultiLevel().isEnabled()) {
+            types.add("multilevel");
+        }
+        return types;
+    }
+
+    @Override
+    public CacheMonitorService.CacheStats getCacheStatsByKey(String key) {
+        try {
+            CacheStatsService.CacheStats stats = cacheStatsService.getStats(key);
+            CacheMonitorService.CacheStats result = new CacheMonitorService.CacheStats();
+            result.setHitCount(stats.getHitCount());
+            result.setMissCount(stats.getMissCount());
+            result.setTotalSize(stats.getTotalLoadTime());
+            result.setLastAccessTime(System.currentTimeMillis());
+            result.setLastUpdateTime(System.currentTimeMillis());
+            return result;
+        } catch (Exception e) {
+            log.error("获取缓存统计信息失败, key: {}", key, e);
+            return new CacheMonitorService.CacheStats();
+        }
+    }
+
+    @Override
+    public CacheMonitorService.CacheStats getCacheStatsByType(String type) {
+        try {
+            CacheStatsService.CacheStats stats = cacheStatsService.getStats(type);
+            CacheMonitorService.CacheStats result = new CacheMonitorService.CacheStats();
+            result.setHitCount(stats.getHitCount());
+            result.setMissCount(stats.getMissCount());
+            result.setTotalSize(stats.getTotalLoadTime());
+            result.setLastAccessTime(System.currentTimeMillis());
+            result.setLastUpdateTime(System.currentTimeMillis());
+            return result;
+        } catch (Exception e) {
+            log.error("获取缓存统计信息失败, type: {}", type, e);
+            return new CacheMonitorService.CacheStats();
+        }
+    }
+
+    @Override
+    public CacheMonitorService.CacheStats getCacheStats() {
+        try {
+            CacheStatsService.CacheStats stats = cacheStatsService.getTotalStats();
+            CacheMonitorService.CacheStats result = new CacheMonitorService.CacheStats();
+            result.setHitCount(stats.getHitCount());
+            result.setMissCount(stats.getMissCount());
+            result.setTotalSize(stats.getTotalLoadTime());
+            result.setLastAccessTime(System.currentTimeMillis());
+            result.setLastUpdateTime(System.currentTimeMillis());
+            return result;
+        } catch (Exception e) {
+            log.error("获取缓存统计信息失败", e);
+            return new CacheMonitorService.CacheStats();
+        }
     }
 } 

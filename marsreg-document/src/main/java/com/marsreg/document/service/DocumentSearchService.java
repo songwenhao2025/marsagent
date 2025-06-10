@@ -1,20 +1,39 @@
 package com.marsreg.document.service;
 
-import com.marsreg.document.entity.Document;
+import com.marsreg.document.entity.DocumentEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
 
+import com.marsreg.document.model.DocumentSearchRequest;
+import com.marsreg.document.model.DocumentSearchResponse;
+
 public interface DocumentSearchService {
     /**
-     * 基础搜索
-     * @param query 搜索关键词
+     * 搜索文档
+     * @param keyword 关键词
      * @param pageable 分页参数
      * @return 文档分页结果
      */
-    Page<Document> search(String query, Pageable pageable);
+    Page<DocumentEntity> search(String keyword, Pageable pageable);
+
+    /**
+     * 高级搜索
+     * @param criteria 搜索条件
+     * @param pageable 分页参数
+     * @return 文档分页结果
+     */
+    Page<DocumentEntity> advancedSearch(Map<String, Object> criteria, Pageable pageable);
+
+    /**
+     * 相似文档搜索
+     * @param documentId 文档ID
+     * @param pageable 分页参数
+     * @return 相似文档分页结果
+     */
+    Page<DocumentEntity> findSimilar(Long documentId, Pageable pageable);
 
     /**
      * 内容搜索
@@ -22,7 +41,7 @@ public interface DocumentSearchService {
      * @param pageable 分页参数
      * @return 文档分页结果
      */
-    Page<Document> searchContent(String query, Pageable pageable);
+    Page<DocumentEntity> searchContent(String query, Pageable pageable);
 
     /**
      * 标题搜索
@@ -30,7 +49,7 @@ public interface DocumentSearchService {
      * @param pageable 分页参数
      * @return 文档分页结果
      */
-    Page<Document> searchTitle(String query, Pageable pageable);
+    Page<DocumentEntity> searchTitle(String query, Pageable pageable);
 
     /**
      * 带高亮的搜索
@@ -120,4 +139,11 @@ public interface DocumentSearchService {
      * @param userId 用户ID
      */
     void recordSuggestionUsage(String suggestion, String userId);
+
+    /**
+     * 搜索文档
+     * @param request 搜索请求
+     * @return 搜索响应
+     */
+    DocumentSearchResponse searchDocuments(DocumentSearchRequest request);
 } 

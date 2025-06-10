@@ -36,4 +36,7 @@ public class DocumentCategory extends BaseEntity {
 
     @Column(nullable = false)
     private String createdBy;
+
+    @OneToMany(mappedBy = "category")
+    private java.util.List<DocumentEntity> documents;
 } 

@@ -19,6 +19,7 @@ import javax.annotation.PostConstruct;
 public class SynonymServiceImpl implements SynonymService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     private static final String SYNONYM_GROUP_KEY = "search:synonym:group:";
     private static final String SYNONYM_TERM_KEY = "search:synonym:term:";
@@ -293,15 +294,16 @@ public class SynonymServiceImpl implements SynonymService {
             int end = Math.min(i + BATCH_SIZE, groups.size());
             List<SynonymGroup> batch = groups.subList(i, end);
             
+            // 为每个组生成ID
+            for (SynonymGroup group : batch) {
+                group.setId(UUID.randomUUID().toString());
+            }
+            
             // 批量保存同义词组
             Map<String, String> groupMap = batch.stream()
                 .collect(Collectors.toMap(
                     group -> SYNONYM_GROUP_KEY + group.getId(),
-                    group -> {
-                        String groupId = UUID.randomUUID().toString();
-                        group.setId(groupId);
-                        return group.toString();
-                    }
+                    SynonymGroup::toString
                 ));
             redisTemplate.opsForValue().multiSet(groupMap);
             
@@ -369,8 +371,7 @@ public class SynonymServiceImpl implements SynonymService {
     
     private SynonymGroup parseSynonymGroup(String groupStr) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.readValue(groupStr, SynonymGroup.class);
+            return objectMapper.readValue(groupStr, SynonymGroup.class);
         } catch (Exception e) {
             log.error("Failed to parse synonym group: {}", groupStr, e);
             return null;
