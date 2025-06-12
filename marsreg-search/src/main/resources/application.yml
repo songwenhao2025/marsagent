@@ -27,6 +27,16 @@ spring:
         max-wait: -1
         max-idle: 8
         min-idle: 0
+  elasticsearch:
+    rest:
+      uris: http://localhost:9200
+      username: elastic
+      password: changeme
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1800000
+      cache-null-values: false
 
 # 检索服务配置
 search:
@@ -49,4 +59,24 @@ search:
     # 是否启用缓存
     enabled: true
     # 缓存过期时间（秒）
-    expire-time: 3600 
+    expire-time: 3600
+
+elasticsearch:
+  host: localhost
+  port: 9200
+  username: elastic
+  password: changeme
+  index:
+    settings:
+      number_of_shards: 3
+      number_of_replicas: 1
+      analysis:
+        analyzer:
+          ik_smart_analyzer:
+            type: custom
+            tokenizer: ik_smart
+            filter: [lowercase, asciifolding]
+          ik_max_word_analyzer:
+            type: custom
+            tokenizer: ik_max_word
+            filter: [lowercase, asciifolding] 
