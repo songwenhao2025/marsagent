@@ -56,6 +56,23 @@ spring:
         max-size: 8
         queue-capacity: 100
         keep-alive: 60s
+  main:
+    allow-bean-definition-overriding: true
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 1s
+    socket-timeout: 30s
+    username: elastic
+    password: changeme
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+      client:
+        reactive:
+          endpoints: localhost:9200
+          username: elastic
+          password: changeme
 
 logging:
   level:

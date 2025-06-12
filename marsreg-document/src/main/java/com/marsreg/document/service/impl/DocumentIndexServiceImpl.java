@@ -5,6 +5,7 @@ import com.marsreg.document.config.IndexConfig;
 import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.exception.DocumentIndexException;
 import com.marsreg.document.repository.MarsregDocumentRepository;
+import com.marsreg.document.repository.DocumentIndexJpaRepository;
 import com.marsreg.document.service.DocumentIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
     private final IndexConfig indexConfig;
     private final MarsregDocumentRepository documentRepository;
+    private final DocumentIndexJpaRepository documentIndexRepository;
 
     private Directory directory;
     private Analyzer analyzer;
@@ -442,7 +444,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             doc.add(new StringField("category", document.getCategory(), Field.Store.YES));
         }
         if (document.getTags() != null && !document.getTags().isEmpty()) {
-            doc.add(new StringField("tags", document.getTags(), Field.Store.YES));
+            doc.add(new StringField("tags", String.join(",", document.getTags()), Field.Store.YES));
         }
         if (document.getErrorMessage() != null) {
             doc.add(new TextField("errorMessage", document.getErrorMessage(), Field.Store.YES));

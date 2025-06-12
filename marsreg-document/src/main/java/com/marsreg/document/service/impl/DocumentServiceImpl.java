@@ -206,7 +206,7 @@ public class DocumentServiceImpl implements DocumentService {
         document.setContentType(metadata.getContentType());
         document.setStatus(DocumentStatus.valueOf(metadata.getStatus()));
         document.setDescription(metadata.getDescription());
-        document.setTags(metadata.getTags());
+        document.setTags(String.join(",", metadata.getTags()));
         document.setCustomMetadata(metadata.getCustomMetadata());
         document = documentRepository.save(document);
         DocumentEntity entity = new DocumentEntity();

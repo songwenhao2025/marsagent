@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>MarsReg RAG系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .module-card {
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .system-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">MarsReg RAG系统</h1>
+        
+        <!-- 文档管理模块 -->
+        <div class="card module-card">
+            <div class="card-header">
+                <h5 class="mb-0">文档管理</h5>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">选择文档</label>
+                        <input type="file" class="form-control" id="file" name="file">
+                    </div>
+                    <div class="mb-3">
+                        <label for="title" class="form-label">文档标题</label>
+                        <input type="text" class="form-control" id="title" name="title">
+                    </div>
+                    <div class="mb-3">
+                        <label for="type" class="form-label">文档类型</label>
+                        <select class="form-select" id="type" name="type">
+                            <option value="technical">技术文档</option>
+                            <option value="manual">使用手册</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">上传文档</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 搜索模块 -->
+        <div class="card module-card">
+            <div class="card-header">
+                <h5 class="mb-0">文档搜索</h5>
+            </div>
+            <div class="card-body">
+                <div class="search-box">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchQuery" placeholder="输入搜索关键词...">
+                        <button class="btn btn-primary" onclick="performSearch()">搜索</button>
+                    </div>
+                </div>
+                <div id="searchResults" class="mt-3">
+                    <!-- 搜索结果将在这里显示 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- RAG问答模块 -->
+        <div class="card module-card">
+            <div class="card-header">
+                <h5 class="mb-0">智能问答</h5>
+            </div>
+            <div class="card-body">
+                <div class="chat-container" id="chatContainer">
+                    <!-- 对话内容将在这里显示 -->
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="questionInput" placeholder="输入您的问题...">
+                    <button class="btn btn-primary" onclick="askQuestion()">提问</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 文档上传
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file').files[0]);
+            formData.append('metadata', JSON.stringify({
+                title: document.getElementById('title').value,
+                type: document.getElementById('type').value
+            }));
+
+            try {
+                const response = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                alert('文档上传成功！');
+            } catch (error) {
+                alert('文档上传失败：' + error.message);
+            }
+        });
+
+        // 搜索功能
+        async function performSearch() {
+            const query = document.getElementById('searchQuery').value;
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        page: 0,
+                        size: 10
+                    })
+                });
+                const results = await response.json();
+                displaySearchResults(results);
+            } catch (error) {
+                alert('搜索失败：' + error.message);
+            }
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            container.innerHTML = results.content.map(doc => `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <h5 class="card-title">${doc.title}</h5>
+                        <p class="card-text">${doc.content}</p>
+                        <small class="text-muted">相关度：${doc.score}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // RAG问答
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value;
+            if (!question) return;
+
+            // 添加用户问题到聊天界面
+            addMessage(question, 'user');
+            document.getElementById('questionInput').value = '';
+
+            try {
+                const response = await fetch('/api/inference/infer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        parameters: {
+                            temperature: 0.7,
+                            max_tokens: 1000
+                        }
+                    })
+                });
+                const result = await response.json();
+                addMessage(result.answer, 'system');
+            } catch (error) {
+                addMessage('抱歉，处理您的问题时出现错误：' + error.message, 'system');
+            }
+        }
+
+        function addMessage(text, type) {
+            const container = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = text;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

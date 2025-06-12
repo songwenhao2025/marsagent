@@ -19,6 +19,17 @@ spring:
         max-wait: -1
         max-idle: 8
         min-idle: 0
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+    mode: HTML
+  mvc:
+    static-path-pattern: /static/**
+  web:
+    resources:
+      static-locations: classpath:/static/
 
 # 监控配置
 management:
