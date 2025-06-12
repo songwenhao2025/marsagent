@@ -26,6 +26,7 @@ public class IntegrationTestConfig extends ElasticsearchConfiguration {
         elasticsearchContainer.withExposedPorts(9200);
         elasticsearchContainer.withEnv("discovery.type", "single-node");
         elasticsearchContainer.withEnv("xpack.security.enabled", "false");
+        elasticsearchContainer.withEnv("ES_JAVA_OPTS", "-Xms512m -Xmx512m");
         elasticsearchContainer.start();
     }
 
@@ -39,6 +40,8 @@ public class IntegrationTestConfig extends ElasticsearchConfiguration {
     public ClientConfiguration clientConfiguration() {
         return ClientConfiguration.builder()
             .connectedTo(elasticsearchContainer.getHost() + ":" + elasticsearchContainer.getMappedPort(9200))
+            .withSocketTimeout(30000)
+            .withConnectTimeout(1000)
             .build();
     }
 } 

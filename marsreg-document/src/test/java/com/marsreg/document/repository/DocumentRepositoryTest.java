@@ -1,7 +1,7 @@
 package com.marsreg.document.repository;
 
-import com.marsreg.document.entity.DocumentEntity;
-import com.marsreg.document.enums.DocumentStatus;
+import com.marsreg.document.entity.Document;
+import com.marsreg.common.enums.DocumentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,24 +32,23 @@ public class DocumentRepositoryTest {
         documentRepository.deleteAll();
     }
 
-    private DocumentEntity createTestDocument(String name, String content) {
-        DocumentEntity document = new DocumentEntity();
+    private Document createTestDocument(String name, String content) {
+        Document document = new Document();
         document.setName(name);
-        document.setOriginalName(name);
         document.setContentType("text/plain");
         document.setSize((long) content.length());
-        document.setStatus(DocumentStatus.ACTIVE);
+        document.setStatus(com.marsreg.document.entity.DocumentStatus.COMPLETED);
         return document;
     }
 
     @Test
     void testSaveAndFindById() {
         // 创建测试文档
-        DocumentEntity document = createTestDocument("测试文档", "这是一个测试文档");
+        Document document = createTestDocument("测试文档", "这是一个测试文档");
         documentRepository.save(document);
 
         // 查找文档
-        Optional<DocumentEntity> found = documentRepository.findById(document.getId());
+        Optional<Document> found = documentRepository.findById(document.getId());
         assertTrue(found.isPresent());
         assertEquals(document.getName(), found.get().getName());
     }
@@ -57,21 +56,21 @@ public class DocumentRepositoryTest {
     @Test
     void testFindAll() {
         // 创建测试文档
-        List<DocumentEntity> documents = Arrays.asList(
+        List<Document> documents = Arrays.asList(
             createTestDocument("测试文档1", "这是第一个测试文档"),
             createTestDocument("测试文档2", "这是第二个测试文档")
         );
         documentRepository.saveAll(documents);
 
         // 查找所有文档
-        List<DocumentEntity> found = documentRepository.findAll();
+        List<Document> found = documentRepository.findAll();
         assertEquals(2, found.size());
     }
 
     @Test
     void testDeleteById() {
         // 创建测试文档
-        DocumentEntity document = createTestDocument("测试文档", "这是一个测试文档");
+        Document document = createTestDocument("测试文档", "这是一个测试文档");
         documentRepository.save(document);
 
         // 删除文档
@@ -82,7 +81,7 @@ public class DocumentRepositoryTest {
     @Test
     void testFindAllWithPagination() {
         // 创建测试文档
-        List<DocumentEntity> documents = Arrays.asList(
+        List<Document> documents = Arrays.asList(
             createTestDocument("测试文档1", "这是第一个测试文档"),
             createTestDocument("测试文档2", "这是第二个测试文档"),
             createTestDocument("测试文档3", "这是第三个测试文档")
@@ -91,7 +90,7 @@ public class DocumentRepositoryTest {
 
         // 分页查找文档
         Pageable pageable = PageRequest.of(0, 2);
-        Page<DocumentEntity> page = documentRepository.findAll(pageable);
+        Page<Document> page = documentRepository.findAll(pageable);
         
         assertEquals(2, page.getContent().size());
         assertEquals(3, page.getTotalElements());

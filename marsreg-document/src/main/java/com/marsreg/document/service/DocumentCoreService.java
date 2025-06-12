@@ -39,6 +39,12 @@ public interface DocumentCoreService {
     void updateDocumentIndex(DocumentEntity document);
     
     /**
+     * 删除文档索引
+     * @param documentId 文档ID
+     */
+    void deleteDocumentIndex(Long documentId);
+    
+    /**
      * 提取文本
      * @param document 文档实体
      * @return 提取的文本

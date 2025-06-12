@@ -4,13 +4,11 @@ import com.marsreg.common.model.Document;
 import lombok.Getter;
 
 @Getter
-public class DocumentCreatedEvent extends DocumentEvent {
+public class DocumentCreatedEvent extends BaseDocumentEvent {
     private final Document document;
     
     public DocumentCreatedEvent(Document document) {
-        super();
+        super(document, document.getId());
         this.document = document;
-        this.setDocumentId(document.getId());
-        this.setOperationType("CREATE");
     }
 } 

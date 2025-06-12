@@ -1,48 +1,39 @@
 package com.marsreg.document.validation;
 
-import com.marsreg.document.exception.FileValidationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Arrays;
-import java.util.List;
-
 @Slf4j
-@Component
 public class FileValidator {
+    private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    private static final String[] ALLOWED_CONTENT_TYPES = {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+        "text/markdown"
+    };
 
-    @Value("${aliyun.oss.maxFileSize}")
-    private long maxFileSize;
-
-    @Value("${aliyun.oss.allowedFileTypes}")
-    private String allowedFileTypes;
-
-    public void validate(MultipartFile file) {
-        validateFileSize(file);
-        validateFileType(file);
-    }
-
-    private void validateFileSize(MultipartFile file) {
-        if (file.getSize() > maxFileSize) {
-            log.error("文件大小超过限制: {} > {}", file.getSize(), maxFileSize);
-            throw new FileValidationException("文件大小超过限制");
-        }
-    }
-
-    private void validateFileType(MultipartFile file) {
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null) {
-            throw new FileValidationException("文件名不能为空");
+    public static void validate(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("文件不能为空");
         }
 
-        String extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
-        List<String> allowedTypes = Arrays.asList(allowedFileTypes.split(","));
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("文件大小超过限制");
+        }
 
-        if (!allowedTypes.contains(extension)) {
-            log.error("不支持的文件类型: {}", extension);
-            throw new FileValidationException("不支持的文件类型");
+        String contentType = file.getContentType();
+        boolean isAllowedType = false;
+        for (String allowedType : ALLOWED_CONTENT_TYPES) {
+            if (allowedType.equals(contentType)) {
+                isAllowedType = true;
+                break;
+            }
+        }
+
+        if (!isAllowedType) {
+            throw new IllegalArgumentException("不支持的文件类型");
         }
     }
 } 

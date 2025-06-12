@@ -67,8 +67,8 @@ public class DocumentIndexSyncPerformanceTest {
         // 准备测试数据
         List<Document> documents = IntStream.range(0, DOCUMENT_COUNT)
             .mapToObj(i -> Document.builder()
-                .id("test-doc-" + i)
-                .title("测试文档" + i)
+                .id((long) i)
+                .name("测试文档" + i)
                 .content("这是测试文档" + i + "的内容")
                 .build())
             .collect(Collectors.toList());
@@ -112,8 +112,8 @@ public class DocumentIndexSyncPerformanceTest {
                     // 准备测试数据
                     List<Document> documents = IntStream.range(0, BATCH_SIZE)
                         .mapToObj(j -> Document.builder()
-                            .id("test-doc-" + threadId + "-" + j)
-                            .title("测试文档" + threadId + "-" + j)
+                            .id((long) (threadId * BATCH_SIZE + j))
+                            .name("测试文档" + threadId + "-" + j)
                             .content("这是测试文档" + threadId + "-" + j + "的内容")
                             .build())
                         .collect(Collectors.toList());
@@ -184,8 +184,8 @@ public class DocumentIndexSyncPerformanceTest {
         // 准备测试数据
         List<Document> documents = IntStream.range(0, DOCUMENT_COUNT)
             .mapToObj(i -> Document.builder()
-                .id("test-doc-" + i)
-                .title("测试文档" + i)
+                .id((long) i)
+                .name("测试文档" + i)
                 .content("这是测试文档" + i + "的内容")
                 .build())
             .collect(Collectors.toList());

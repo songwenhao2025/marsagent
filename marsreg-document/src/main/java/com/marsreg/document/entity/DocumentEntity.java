@@ -1,10 +1,15 @@
 package com.marsreg.document.entity;
 
-import com.marsreg.document.enums.DocumentStatus;
+import com.marsreg.common.enums.DocumentStatus;
+import com.marsreg.common.model.BaseDocument;
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.annotation.Id;
+import lombok.EqualsAndHashCode;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
@@ -15,9 +20,10 @@ import java.util.List;
 @Data
 @Entity
 @Table(name = "documents")
+@EntityListeners(AuditingEntityListener.class)
+@EqualsAndHashCode(callSuper = true)
 @Document(indexName = "documents")
-@Slf4j
-public class DocumentEntity {
+public class DocumentEntity extends BaseDocument {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -59,35 +65,13 @@ public class DocumentEntity {
     @Column(name = "status")
     private DocumentStatus status;
     
-    @Field(type = FieldType.Date)
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-    
-    @Field(type = FieldType.Date)
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-    
-    @Field(type = FieldType.Keyword)
-    @Column(name = "created_by")
-    private String createdBy;
-    
-    @Field(type = FieldType.Keyword)
-    @Column(name = "updated_by")
-    private String updatedBy;
-    
     @Field(type = FieldType.Keyword)
     @Column(name = "category")
     private String category;
     
     @Field(type = FieldType.Keyword)
-    @ElementCollection
-    @ManyToMany
-    @JoinTable(
-        name = "document_tags",
-        joinColumns = @JoinColumn(name = "document_id"),
-        inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    private List<String> tags;
+    @Column(name = "tags")
+    private String tags;
     
     @Field(type = FieldType.Text, analyzer = "ik_max_word")
     @Column(name = "content", columnDefinition = "TEXT")
@@ -107,6 +91,22 @@ public class DocumentEntity {
     @Field(type = FieldType.Date)
     @Column(name = "processed_time")
     private LocalDateTime processedTime;
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @CreatedBy
+    @Column(name = "created_by", updatable = false)
+    private String createdBy;
+
+    @LastModifiedBy
+    @Column(name = "updated_by")
+    private String updatedBy;
 
     public LocalDateTime getProcessedTime() {
         return processedTime;

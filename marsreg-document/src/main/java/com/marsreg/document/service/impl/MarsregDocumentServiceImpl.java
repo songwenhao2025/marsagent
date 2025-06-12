@@ -7,6 +7,8 @@ import com.marsreg.document.repository.MarsregDocumentRepository;
 import com.marsreg.document.service.MarsregDocumentService;
 import com.marsreg.search.service.DocumentSearchFacade;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.stream.Collectors;
 
@@ -47,29 +49,29 @@ public class MarsregDocumentServiceImpl implements MarsregDocumentService {
 
     @Override
     public DocumentSearchResponse searchDocuments(DocumentSearchRequest request) {
-        com.marsreg.common.model.DocumentSearchRequest commonRequest = com.marsreg.common.model.DocumentSearchRequest.builder()
-            .query(request.getQuery())
-            .page(request.getPage())
-            .size(request.getSize())
-            .build();
-            
-        com.marsreg.common.model.DocumentSearchResponse commonResponse = documentSearchFacade.searchDocuments(commonRequest);
+        com.marsreg.common.dto.DocumentQueryDTO queryDTO = new com.marsreg.common.dto.DocumentQueryDTO();
+        queryDTO.setKeyword(request.getQuery());
+        
+        Page<com.marsreg.common.model.Document> documentPage = documentSearchFacade.search(
+            queryDTO, 
+            Pageable.ofSize(request.getSize()).withPage(request.getPage())
+        );
         
         DocumentSearchResponse response = new DocumentSearchResponse();
-        response.setDocuments(commonResponse.getDocuments().stream()
+        response.setDocuments(documentPage.getContent().stream()
             .map(doc -> {
                 MarsregDocument marsregDoc = new MarsregDocument();
                 marsregDoc.setId(doc.getId().toString());
-                marsregDoc.setTitle(doc.getTitle());
+                marsregDoc.setTitle(doc.getName());
                 marsregDoc.setContent(doc.getContent());
                 marsregDoc.setType(doc.getType());
                 marsregDoc.setStatus(doc.getStatus());
                 return marsregDoc;
             })
             .collect(Collectors.toList()));
-        response.setTotal(commonResponse.getTotal());
-        response.setPage(commonResponse.getPage());
-        response.setSize(commonResponse.getSize());
+        response.setTotal(documentPage.getTotalElements());
+        response.setPage(request.getPage());
+        response.setSize(request.getSize());
         return response;
     }
 } 

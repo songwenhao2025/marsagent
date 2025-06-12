@@ -1,6 +1,7 @@
 package com.marsreg.document.service.impl;
 
 import com.marsreg.document.entity.DocumentChunkMetadata;
+import com.marsreg.document.entity.DocumentChunk;
 import com.marsreg.document.repository.DocumentChunkMetadataRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import lombok.RequiredArgsConstructor;
@@ -110,7 +111,9 @@ public class DocumentChunkMetadataServiceImpl implements DocumentChunkMetadataSe
     @Override
     public void saveMetadata(Long chunkId, String key, String value, String type, String description) {
         DocumentChunkMetadata metadata = new DocumentChunkMetadata();
-        metadata.setChunkId(chunkId);
+        DocumentChunk chunk = new DocumentChunk();
+        chunk.setId(chunkId);
+        metadata.setChunk(chunk);
         metadata.setKey(key);
         metadata.setValue(value);
         metadata.setType(type);

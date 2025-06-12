@@ -5,9 +5,9 @@ import com.marsreg.common.annotation.RateLimit;
 import com.marsreg.common.exception.BusinessException;
 import com.marsreg.common.response.Result;
 import com.marsreg.document.dto.DocumentDTO;
-import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentContent;
 import com.marsreg.document.entity.DocumentChunkMetadata;
+import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.repository.DocumentContentRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentProcessService;
@@ -16,7 +16,7 @@ import com.marsreg.document.service.DocumentVectorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Tag(name = "文档管理", description = "文档上传、处理和管理接口")
 @RestController
@@ -39,15 +40,13 @@ public class DocumentController {
     private final DocumentVectorService documentVectorService;
 
     @Operation(summary = "上传文档")
-    @PostMapping("/upload")
+    @PostMapping
     @Log(module = "文档管理", operation = "上传", description = "上传文档")
     @RateLimit(key = "#request.file.originalFilename", limit = 100, time = 60)
-    public ResponseEntity<DocumentEntity> upload(@RequestParam("file") MultipartFile file) {
-        try {
-            return ResponseEntity.ok(documentService.upload(file));
-        } catch (IOException e) {
-            throw new BusinessException("文档上传失败: " + e.getMessage());
-        }
+    public ResponseEntity<DocumentDTO> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("metadata") DocumentDTO metadata) throws IOException {
+        return ResponseEntity.ok(documentService.createDocument(file, metadata));
     }
 
     @Operation(summary = "获取文档信息")
@@ -55,8 +54,7 @@ public class DocumentController {
     @Log(module = "文档管理", operation = "查询", description = "查询文档详情")
     @RateLimit(limit = 200, time = 60)
     public ResponseEntity<DocumentDTO> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(documentService.getDocument(id)
-            .orElseThrow(() -> new BusinessException("文档不存在")));
+        return ResponseEntity.ok(documentService.getDocument(id).orElseThrow(() -> new BusinessException("文档不存在")));
     }
 
     @Operation(summary = "删除文档")
@@ -73,12 +71,6 @@ public class DocumentController {
     public Result<DocumentContent> getDocumentContent(@PathVariable Long id) {
         return Result.success(documentContentRepository.findByDocumentId(id)
                 .orElseThrow(() -> new BusinessException("文档内容不存在")));
-    }
-
-    @Operation(summary = "获取文档分块")
-    @GetMapping("/{id}/chunks")
-    public Result<List<String>> getDocumentChunks(@PathVariable Long id) {
-        return Result.success(documentProcessService.getChunks(id));
     }
 
     @Operation(summary = "分页查询文档")
@@ -113,8 +105,6 @@ public class DocumentController {
             @PathVariable Long id,
             @PathVariable Long chunkId,
             @RequestBody DocumentChunkMetadata metadata) {
-        metadata.setDocumentId(id);
-        metadata.setChunkId(chunkId);
         return Result.success(metadataService.save(metadata));
     }
 
@@ -128,15 +118,6 @@ public class DocumentController {
         return Result.success();
     }
 
-    @Operation(summary = "语义搜索文档分块")
-    @GetMapping("/search")
-    public Result<List<Map<String, Object>>> searchChunks(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "0.7") float minScore) {
-        return Result.success(documentVectorService.searchChunks(query, limit, minScore));
-    }
-
     @Operation(summary = "按文档ID语义搜索分块")
     @GetMapping("/{documentId}/search")
     public Result<List<Map<String, Object>>> searchChunksByDocument(
@@ -148,9 +129,16 @@ public class DocumentController {
     }
 
     @PostMapping("/batch-upload")
-    public ResponseEntity<List<DocumentEntity>> batchUpload(@RequestParam("files") List<MultipartFile> files) {
+    public ResponseEntity<List<DocumentDTO>> batchUpload(@RequestParam("files") List<MultipartFile> files) {
         try {
-            return ResponseEntity.ok(documentService.batchUpload(files));
+            List<DocumentEntity> entities = documentService.batchUpload(files);
+            return ResponseEntity.ok(entities.stream()
+                    .map(entity -> {
+                        DocumentDTO dto = new DocumentDTO();
+                        BeanUtils.copyProperties(entity, dto);
+                        return dto;
+                    })
+                    .collect(Collectors.toList()));
         } catch (IOException e) {
             throw new BusinessException("批量文档上传失败: " + e.getMessage());
         }
@@ -160,5 +148,12 @@ public class DocumentController {
     public ResponseEntity<Void> batchDelete(@RequestBody List<Long> ids) {
         documentService.batchDelete(ids);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DocumentDTO> updateDocument(
+            @PathVariable Long id,
+            @RequestBody DocumentDTO metadata) {
+        return ResponseEntity.ok(documentService.updateDocument(id, metadata));
     }
 } 

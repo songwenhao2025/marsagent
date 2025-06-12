@@ -21,11 +21,11 @@ public class DocumentEventListener {
 
     @EventListener
     public void handleDocumentUpdated(DocumentUpdatedEvent event) {
-        documentIndexSyncService.updateDocument(event.getNewDocument());
+        documentIndexSyncService.updateDocument(event.getDocument());
     }
 
     @EventListener
     public void handleDocumentDeleted(DocumentDeletedEvent event) {
-        documentIndexSyncService.deleteDocument(event.getDocument().getId());
+        documentIndexSyncService.deleteDocument(event.getDocumentId().toString());
     }
 } 

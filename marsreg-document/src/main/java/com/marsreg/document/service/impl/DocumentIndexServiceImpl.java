@@ -23,6 +23,8 @@ import org.apache.lucene.store.FSDirectory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +59,8 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
+
+    private static final String INDEX_NAME = "documents";
 
     @PostConstruct
     public void init() throws IOException {
@@ -99,16 +103,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }, allEntries = true)
     public void indexDocument(DocumentEntity document, List<String> fields) {
         try {
-            indexLock.lock();
-            Document doc = createLuceneDocument(document);
-            indexWriter.addDocument(doc);
-            indexWriter.commit();
-            log.info("文档索引成功: {}", document.getId());
-        } catch (IOException e) {
-            log.error("文档索引失败: {}", document.getId(), e);
-            throw new DocumentIndexException("DOC_INDEX_003", "文档索引失败", e);
-        } finally {
-            indexLock.unlock();
+            org.springframework.data.elasticsearch.core.document.Document esDocument = createEsDocument(document, fields);
+            elasticsearchOperations.save(esDocument, IndexCoordinates.of(INDEX_NAME));
+            log.info("Document indexed successfully: {}", document.getId());
+        } catch (Exception e) {
+            log.error("Error indexing document: {}", document.getId(), e);
+            throw new RuntimeException("Failed to index document", e);
         }
     }
 
@@ -152,20 +152,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }, allEntries = true)
     public void updateIndex(DocumentEntity document, List<String> fields) {
         try {
-            indexLock.lock();
-            // 删除旧文档
-            indexWriter.deleteDocuments(new Term("id", document.getId().toString()));
-
-            // 创建新的Lucene文档
-            Document doc = createLuceneDocument(document);
-            indexWriter.addDocument(doc);
-            indexWriter.commit();
-            log.info("更新索引成功: {}", document.getId());
-        } catch (IOException e) {
-            log.error("更新索引失败: {}", document.getId(), e);
-            throw new DocumentIndexException("DOC_INDEX_005", "更新索引失败", e);
-        } finally {
-            indexLock.unlock();
+            org.springframework.data.elasticsearch.core.document.Document esDocument = createEsDocument(document, fields);
+            elasticsearchOperations.save(esDocument, IndexCoordinates.of(INDEX_NAME));
+            log.info("Document index updated successfully: {}", document.getId());
+        } catch (Exception e) {
+            log.error("Error updating document index: {}", document.getId(), e);
+            throw new RuntimeException("Failed to update document index", e);
         }
     }
 
@@ -178,15 +170,11 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }, allEntries = true)
     public void deleteIndex(Long documentId) {
         try {
-            indexLock.lock();
-            indexWriter.deleteDocuments(new Term("id", documentId.toString()));
-            indexWriter.commit();
-            log.info("删除索引成功: {}", documentId);
-        } catch (IOException e) {
-            log.error("删除索引失败: {}", documentId, e);
-            throw new DocumentIndexException("DOC_INDEX_006", "删除索引失败", e);
-        } finally {
-            indexLock.unlock();
+            elasticsearchOperations.delete(documentId.toString(), IndexCoordinates.of(INDEX_NAME));
+            log.info("Document index deleted successfully: {}", documentId);
+        } catch (Exception e) {
+            log.error("Error deleting document index: {}", documentId, e);
+            throw new RuntimeException("Failed to delete document index", e);
         }
     }
 
@@ -454,9 +442,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             doc.add(new StringField("category", document.getCategory(), Field.Store.YES));
         }
         if (document.getTags() != null && !document.getTags().isEmpty()) {
-            for (String tag : document.getTags()) {
-                doc.add(new StringField("tags", tag, Field.Store.YES));
-            }
+            doc.add(new StringField("tags", document.getTags(), Field.Store.YES));
         }
         if (document.getErrorMessage() != null) {
             doc.add(new TextField("errorMessage", document.getErrorMessage(), Field.Store.YES));
@@ -495,5 +481,41 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     @Override
     public void updateDocumentIndex(DocumentEntity document) {
         // 实现更新文档索引的逻辑
+    }
+
+    private org.springframework.data.elasticsearch.core.document.Document createEsDocument(DocumentEntity document, List<String> fields) {
+        org.springframework.data.elasticsearch.core.document.Document esDocument = org.springframework.data.elasticsearch.core.document.Document.create();
+        esDocument.setId(document.getId().toString());
+        
+        for (String field : fields) {
+            switch (field) {
+                case "name":
+                    esDocument.put("name", document.getTitle());
+                    break;
+                case "originalName":
+                    esDocument.put("originalName", document.getOriginalName());
+                    break;
+                case "content":
+                    esDocument.put("content", document.getContent());
+                    break;
+                case "contentType":
+                    esDocument.put("contentType", document.getContentType());
+                    break;
+                case "size":
+                    esDocument.put("size", document.getSize());
+                    break;
+                case "md5":
+                    esDocument.put("md5", document.getMd5());
+                    break;
+                case "status":
+                    esDocument.put("status", document.getStatus().toString());
+                    break;
+                case "objectName":
+                    esDocument.put("objectName", document.getObjectName());
+                    break;
+            }
+        }
+        
+        return esDocument;
     }
 } 

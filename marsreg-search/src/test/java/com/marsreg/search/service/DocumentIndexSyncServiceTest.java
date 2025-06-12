@@ -62,8 +62,8 @@ public class DocumentIndexSyncServiceTest {
     void testSyncDocument() {
         // 准备测试文档
         Document document = Document.builder()
-            .id(TEST_DOC_ID)
-            .title("测试文档")
+            .id(1L)
+            .name("测试文档")
             .content("这是一个测试文档的内容")
             .build();
         
@@ -107,14 +107,14 @@ public class DocumentIndexSyncServiceTest {
     void testBatchSyncDocuments() {
         // 准备测试文档
         Document doc1 = Document.builder()
-            .id("test-doc-1")
-            .title("测试文档1")
+            .id(1L)
+            .name("测试文档1")
             .content("这是测试文档1的内容")
             .build();
         
         Document doc2 = Document.builder()
-            .id("test-doc-2")
-            .title("测试文档2")
+            .id(2L)
+            .name("测试文档2")
             .content("这是测试文档2的内容")
             .build();
         
@@ -139,14 +139,14 @@ public class DocumentIndexSyncServiceTest {
     void testRebuildIndex() {
         // 准备测试文档
         Document doc1 = Document.builder()
-            .id("test-doc-1")
-            .title("测试文档1")
+            .id(1L)
+            .name("测试文档1")
             .content("这是测试文档1的内容")
             .build();
         
         Document doc2 = Document.builder()
-            .id("test-doc-2")
-            .title("测试文档2")
+            .id(2L)
+            .name("测试文档2")
             .content("这是测试文档2的内容")
             .build();
         

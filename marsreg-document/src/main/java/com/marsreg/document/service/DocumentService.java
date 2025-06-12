@@ -1,14 +1,17 @@
 package com.marsreg.document.service;
-
+import com.marsreg.common.dto.DocumentMetadataDTO;
 import com.marsreg.document.dto.DocumentDTO;
+import com.marsreg.document.dto.DocumentChunkDTO;
+import com.marsreg.document.dto.DocumentQueryDTO;
 import com.marsreg.document.entity.DocumentEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+
+
 
 /**
  * 文档服务接口
@@ -123,4 +126,48 @@ public interface DocumentService {
      * @return 文档内容
      */
     String getContent(Long id);
+
+    /**
+     * 根据查询条件分页查询文档
+     *
+     * @param query 查询条件
+     * @param pageable 分页参数
+     * @return 文档实体分页结果
+     */
+    Page<DocumentEntity> search(DocumentQueryDTO query, Pageable pageable);
+
+    /**
+     * 获取文档分块
+     *
+     * @param documentId 文档ID
+     * @return 文档分块列表
+     */
+    List<DocumentChunkDTO> getChunks(Long documentId);
+
+    /**
+     * 更新文档元数据
+     *
+     * @param id 文档ID
+     * @param metadata 元数据
+     * @return 更新后的文档实体
+     */
+    DocumentEntity updateMetadata(Long id, DocumentMetadataDTO metadata);
+
+    /**
+     * 更新文档内容
+     *
+     * @param id 文档ID
+     * @param file 文件
+     * @return 更新后的文档实体
+     * @throws IOException IO异常
+     */
+    DocumentEntity updateContent(Long id, MultipartFile file) throws IOException;
+
+    /**
+     * 将文档实体转换为DTO
+     *
+     * @param entity 文档实体
+     * @return 文档DTO
+     */
+    DocumentDTO convertToDTO(DocumentEntity entity);
 } 

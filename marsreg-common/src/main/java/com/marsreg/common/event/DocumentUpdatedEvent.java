@@ -4,15 +4,11 @@ import com.marsreg.common.model.Document;
 import lombok.Getter;
 
 @Getter
-public class DocumentUpdatedEvent extends DocumentEvent {
-    private final Document oldDocument;
-    private final Document newDocument;
+public class DocumentUpdatedEvent extends BaseDocumentEvent {
+    private final Document document;
     
-    public DocumentUpdatedEvent(Document oldDocument, Document newDocument) {
-        super();
-        this.oldDocument = oldDocument;
-        this.newDocument = newDocument;
-        this.setDocumentId(newDocument.getId());
-        this.setOperationType("UPDATE");
+    public DocumentUpdatedEvent(Document document) {
+        super(document, document.getId());
+        this.document = document;
     }
 } 

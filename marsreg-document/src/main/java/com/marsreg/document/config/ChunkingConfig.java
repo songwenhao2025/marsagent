@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Data
 @Configuration
-@ConfigurationProperties(prefix = "marsreg.document.chunking")
+@ConfigurationProperties(prefix = "document.chunking")
 public class ChunkingConfig {
     /**
      * 默认最大块大小（字符数）
@@ -16,12 +16,17 @@ public class ChunkingConfig {
     /**
      * 默认最小块大小（字符数）
      */
-    private int defaultMinChunkSize = 200;
+    private int defaultMinChunkSize = 100;
 
     /**
      * 默认重叠大小（字符数）
      */
     private int defaultOverlapSize = 100;
+
+    /**
+     * 默认语言
+     */
+    private String defaultLanguage = "zh";
 
     /**
      * 是否启用智能分块

@@ -1,0 +1,37 @@
+spring:
+  elasticsearch:
+    uris: http://localhost:9200
+    username: elastic
+    password: changeme
+    ssl:
+      verification-mode: none
+    connection-timeout: 1s
+    socket-timeout: 30s
+    max-conn-total: 100
+    max-conn-per-route: 10
+
+search:
+  index:
+    path: test-index
+  cache:
+    enabled: true
+    type: caffeine
+    max-size: 1000
+    expire-seconds: 3600
+
+vector:
+  storage:
+    type: memory
+    dimension: 384
+    index-type: flat
+    metric-type: cosine
+
+milvus:
+  host: localhost
+  port: 19530
+  collection: test_collection
+  dimension: 384
+  index-type: IVF_FLAT
+  metric-type: L2
+  nlist: 1024
+  nprobe: 10 

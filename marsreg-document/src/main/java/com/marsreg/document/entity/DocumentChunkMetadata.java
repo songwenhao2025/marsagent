@@ -2,6 +2,7 @@ package com.marsreg.document.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -11,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Data
+@Slf4j
 @Entity
 @Table(name = "document_chunk_metadata")
 public class DocumentChunkMetadata {
@@ -18,16 +20,14 @@ public class DocumentChunkMetadata {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "chunk_id", nullable = false)
-    private Long chunkId;
+    @ManyToOne
+    @JoinColumn(name = "chunk_id")
+    private DocumentChunk chunk;
 
-    @Column(name = "document_id", nullable = false)
-    private Long documentId;
-
-    @Column(name = "key", nullable = false)
+    @Column(name = "key")
     private String key;
 
-    @Column(name = "value", columnDefinition = "TEXT")
+    @Column(name = "value")
     private String value;
 
     @Column(name = "type")
@@ -35,11 +35,6 @@ public class DocumentChunkMetadata {
 
     @Column(name = "description")
     private String description;
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "chunk_id", insertable = false, updatable = false)
-    private DocumentChunk chunk;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

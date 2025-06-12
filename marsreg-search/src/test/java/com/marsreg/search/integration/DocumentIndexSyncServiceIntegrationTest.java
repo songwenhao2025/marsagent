@@ -40,7 +40,7 @@ public class DocumentIndexSyncServiceIntegrationTest {
     @MockBean
     private VectorStorageService vectorStorageService;
 
-    private static final String TEST_DOC_ID = "test-doc-1";
+    private static final Long TEST_DOC_ID = 1L;
     private static final float[] TEST_VECTOR = new float[384];
 
     @BeforeEach
@@ -54,15 +54,15 @@ public class DocumentIndexSyncServiceIntegrationTest {
     void testEndToEndSync() {
         Document document = Document.builder()
             .id(TEST_DOC_ID)
-            .title("测试文档")
+            .name("测试文档")
             .content("这是一个测试文档的内容")
             .build();
 
         documentIndexSyncService.indexDocument(document);
 
-        DocumentIndex index = documentIndexRepository.findById(TEST_DOC_ID).orElse(null);
+        DocumentIndex index = documentIndexRepository.findById(TEST_DOC_ID.toString()).orElse(null);
         assertNotNull(index);
-        assertEquals(TEST_DOC_ID, index.getDocumentId());
+        assertEquals(TEST_DOC_ID.toString(), index.getDocumentId());
         assertEquals("测试文档", index.getTitle());
         assertEquals("这是一个测试文档的内容", index.getContent());
         verify(vectorizationService).vectorize(document.getContent());
@@ -71,13 +71,13 @@ public class DocumentIndexSyncServiceIntegrationTest {
     @Test
     void testEndToEndBatchSync() {
         Document doc1 = Document.builder()
-            .id("test-doc-1")
-            .title("测试文档1")
+            .id(1L)
+            .name("测试文档1")
             .content("这是测试文档1的内容")
             .build();
         Document doc2 = Document.builder()
-            .id("test-doc-2")
-            .title("测试文档2")
+            .id(2L)
+            .name("测试文档2")
             .content("这是测试文档2的内容")
             .build();
         List<Document> documents = Arrays.asList(doc1, doc2);

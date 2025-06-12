@@ -65,8 +65,8 @@ public class StressTest {
         // 准备测试数据
         List<Document> documents = IntStream.range(0, DOCUMENT_COUNT)
             .mapToObj(i -> Document.builder()
-                .id("test-doc-" + i)
-                .title("测试文档" + i)
+                .id((long) i)
+                .name("测试文档" + i)
                 .content("这是测试文档" + i + "的内容")
                 .build())
             .collect(Collectors.toList());
@@ -78,16 +78,16 @@ public class StressTest {
         when(vectorStorageService.searchSimilar(any(), anyInt(), anyFloat()))
             .thenReturn(documents.stream()
                 .collect(Collectors.toMap(
-                    Document::getId,
+                    doc -> doc.getId().toString(),
                     doc -> 0.8f
                 )));
         
         // 创建测试文档索引
         List<DocumentIndex> indices = documents.stream()
             .map(doc -> DocumentIndex.builder()
-                .id(doc.getId())
-                .documentId(doc.getId())
-                .title(doc.getTitle())
+                .id(doc.getId().toString())
+                .documentId(doc.getId().toString())
+                .title(doc.getName())
                 .content(doc.getContent())
                 .build())
             .collect(Collectors.toList());
@@ -202,8 +202,8 @@ public class StressTest {
     private void performSync(TestResult result) {
         List<Document> documents = IntStream.range(0, 10)
             .mapToObj(i -> Document.builder()
-                .id("sync-doc-" + UUID.randomUUID())
-                .title("同步文档" + i)
+                .id((long) i)
+                .name("同步文档" + i)
                 .content("这是同步文档" + i + "的内容")
                 .build())
             .collect(Collectors.toList());

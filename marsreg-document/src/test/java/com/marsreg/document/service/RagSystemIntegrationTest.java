@@ -1,5 +1,6 @@
 package com.marsreg.document.service;
 
+import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.document.service.impl.DocumentSearchServiceImpl;
@@ -38,16 +39,16 @@ public class RagSystemIntegrationTest {
     }
 
     private void addTestDocuments() {
-        List<DocumentEntity> documents = new ArrayList<>();
-        DocumentEntity doc1 = new DocumentEntity();
+        List<Document> documents = new ArrayList<>();
+        Document doc1 = new Document();
         doc1.setId(1L);
-        doc1.setOriginalName("测试文档1");
+        doc1.setName("测试文档1");
         doc1.setContent("这是一个测试文档，包含一些关键词和内容。");
         documents.add(doc1);
 
-        DocumentEntity doc2 = new DocumentEntity();
+        Document doc2 = new Document();
         doc2.setId(2L);
-        doc2.setOriginalName("测试文档2");
+        doc2.setName("测试文档2");
         doc2.setContent("这是另一个测试文档，包含不同的关键词和内容。");
         documents.add(doc2);
 

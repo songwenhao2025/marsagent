@@ -1,38 +1,35 @@
 package com.marsreg.document.event;
 
-import com.marsreg.document.entity.DocumentEntity;
-import com.marsreg.document.service.DocumentIndexService;
-import com.marsreg.document.service.DocumentVectorService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
+import com.marsreg.common.event.BaseDocumentEventListener;
+import com.marsreg.common.event.DocumentCreatedEvent;
+import com.marsreg.common.event.DocumentDeletedEvent;
+import com.marsreg.common.event.DocumentUpdatedEvent;
+import com.marsreg.document.service.DocumentEventService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
-public class DocumentEventListener {
+@RequiredArgsConstructor
+public class DocumentEventListener extends BaseDocumentEventListener {
+    private final DocumentEventService documentEventService;
 
-    @Autowired
-    private DocumentIndexService documentIndexService;
-
-    @Autowired
-    private DocumentVectorService documentVectorService;
-
-    @EventListener
-    public void handleDocumentCreatedEvent(DocumentCreatedEvent event) {
-        DocumentEntity document = event.getDocument();
-        documentIndexService.indexDocument(document, java.util.Arrays.asList("name", "originalName", "content", "contentType", "size", "md5", "status", "objectName"));
-        documentVectorService.generateVector(document);
+    @Override
+    protected void handleDocumentCreated(DocumentCreatedEvent event) {
+        log.info("Document created: {}", event.getDocumentId());
+        documentEventService.handleDocumentCreated(event.getDocumentId());
     }
 
-    @EventListener
-    public void handleDocumentUpdatedEvent(DocumentUpdatedEvent event) {
-        DocumentEntity document = event.getDocument();
-        documentIndexService.updateIndex(document, java.util.Arrays.asList("name", "originalName", "content", "contentType", "size", "md5", "status", "objectName"));
-        documentVectorService.generateVector(document);
+    @Override
+    protected void handleDocumentUpdated(DocumentUpdatedEvent event) {
+        log.info("Document updated: {}", event.getDocumentId());
+        documentEventService.handleDocumentUpdated(event.getDocumentId());
     }
 
-    @EventListener
-    public void handleDocumentDeletedEvent(DocumentDeletedEvent event) {
-        Long documentId = event.getDocumentId();
-        documentIndexService.deleteIndex(documentId);
+    @Override
+    protected void handleDocumentDeleted(DocumentDeletedEvent event) {
+        log.info("Document deleted: {}", event.getDocumentId());
+        documentEventService.handleDocumentDeleted(event.getDocumentId());
     }
 } 

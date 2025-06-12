@@ -1,7 +1,8 @@
 package com.marsreg.document.service;
 
+import com.marsreg.document.entity.Document;
 import com.marsreg.document.entity.DocumentEntity;
-import com.marsreg.document.enums.DocumentStatus;
+import com.marsreg.document.entity.DocumentStatus;
 import com.marsreg.document.repository.DocumentRepository;
 import com.marsreg.vector.service.VectorizationService;
 import com.marsreg.vector.service.VectorStorageService;
@@ -44,21 +45,20 @@ public class DocumentSearchServiceTest {
         documentRepository.deleteAll();
     }
 
-    private DocumentEntity createTestDocument(String name, String content) {
-        DocumentEntity document = new DocumentEntity();
+    private Document createTestDocument(String name, String content) {
+        Document document = new Document();
         document.setName(name);
-        document.setOriginalName(name);
         document.setContentType("text/plain");
         document.setSize((long) content.length());
-        document.setStatus(DocumentStatus.ACTIVE);
+        document.setStatus(DocumentStatus.COMPLETED);
         return document;
     }
 
     @Test
     void testSearch() {
         // 创建测试文档
-        DocumentEntity doc1 = createTestDocument("测试文档1", "这是一个测试文档");
-        DocumentEntity doc2 = createTestDocument("测试文档2", "这是另一个测试文档");
+        Document doc1 = createTestDocument("测试文档1", "这是一个测试文档");
+        Document doc2 = createTestDocument("测试文档2", "这是另一个测试文档");
         documentRepository.saveAll(Arrays.asList(doc1, doc2));
 
         // 执行搜索
@@ -73,8 +73,8 @@ public class DocumentSearchServiceTest {
     @Test
     void testSearchWithHighlight() {
         // 创建测试文档
-        DocumentEntity doc1 = createTestDocument("测试文档1", "这是一个测试文档");
-        DocumentEntity doc2 = createTestDocument("测试文档2", "这是另一个测试文档");
+        Document doc1 = createTestDocument("测试文档1", "这是一个测试文档");
+        Document doc2 = createTestDocument("测试文档2", "这是另一个测试文档");
         documentRepository.saveAll(Arrays.asList(doc1, doc2));
 
         // 执行带高亮的搜索
@@ -97,7 +97,7 @@ public class DocumentSearchServiceTest {
     @Test
     void testSearchWithPagination() {
         // 创建测试文档
-        List<DocumentEntity> documents = Arrays.asList(
+        List<Document> documents = Arrays.asList(
             createTestDocument("测试文档1", "这是第一个测试文档"),
             createTestDocument("测试文档2", "这是第二个测试文档"),
             createTestDocument("测试文档3", "这是第三个测试文档")

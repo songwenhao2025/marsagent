@@ -67,4 +67,10 @@ public class DocumentCoreServiceImpl implements DocumentCoreService {
     public List<String> smartChunkText(String text, int maxChunkSize, int overlap) {
         return documentProcessService.smartChunkText(text, maxChunkSize, overlap);
     }
+
+    @Override
+    @Transactional
+    public void deleteDocumentIndex(Long documentId) {
+        documentIndexService.deleteIndex(documentId);
+    }
 } 

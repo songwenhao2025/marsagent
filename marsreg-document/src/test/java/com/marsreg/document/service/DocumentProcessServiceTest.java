@@ -1,7 +1,7 @@
 package com.marsreg.document.service;
 
 import com.marsreg.document.entity.DocumentEntity;
-import com.marsreg.document.enums.DocumentStatus;
+import com.marsreg.common.enums.DocumentStatus;
 import com.marsreg.document.exception.DocumentProcessException;
 import com.marsreg.document.exception.FileValidationException;
 import org.junit.jupiter.api.AfterEach;

@@ -1,12 +1,12 @@
 package com.marsreg.document.service.impl;
 
 import com.marsreg.common.exception.BusinessException;
+import com.marsreg.common.enums.DocumentStatus;
 import com.marsreg.document.config.CacheConfig;
 import com.marsreg.document.config.ChunkingConfig;
 import com.marsreg.document.entity.DocumentEntity;
 import com.marsreg.document.entity.DocumentChunk;
 import com.marsreg.document.entity.DocumentChunkMetadata;
-import com.marsreg.document.enums.DocumentStatus;
 import com.marsreg.document.repository.DocumentChunkRepository;
 import com.marsreg.document.service.DocumentChunkMetadataService;
 import com.marsreg.document.service.DocumentIndexService;
@@ -102,8 +102,19 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
     }
 
     @Override
-    public String processDocument(DocumentEntity document) {
-        return extractText(document);
+    @Transactional
+    public DocumentEntity processDocument(DocumentEntity document) {
+        try {
+            // 分块处理
+            List<DocumentChunk> chunks = splitIntoChunks(document);
+            document.setChunks(chunks);
+            
+            // 保存文档
+            return documentService.save(document);
+        } catch (Exception e) {
+            log.error("Error processing document: {}", document.getId(), e);
+            throw new RuntimeException("Failed to process document", e);
+        }
     }
 
     @Override
@@ -358,8 +369,7 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
 
     private DocumentChunkMetadata createMetadata(DocumentChunk chunk, String key, String value, String type, String description) {
         DocumentChunkMetadata metadata = new DocumentChunkMetadata();
-        metadata.setDocumentId(chunk.getDocument().getId());
-        metadata.setChunkId(chunk.getId());
+        metadata.setChunk(chunk);
         metadata.setKey(key);
         metadata.setValue(value);
         metadata.setType(type);
@@ -423,17 +433,42 @@ public class DocumentProcessServiceImpl implements DocumentProcessService {
         }
     }
 
-    private List<DocumentChunk> splitIntoChunks(String text) {
-        List<String> chunks = smartChunkText(text, chunkingConfig.getDefaultMaxChunkSize(), chunkingConfig.getDefaultMinChunkSize());
-        List<DocumentChunk> documentChunks = new ArrayList<>();
+    private List<DocumentChunk> splitIntoChunks(DocumentEntity document) {
+        String content = document.getContent();
+        if (content == null || content.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        int maxChunkSize = chunkingConfig.getDefaultMaxChunkSize();
+        int overlapSize = chunkingConfig.getDefaultOverlapSize();
+        List<DocumentChunk> chunks = new ArrayList<>();
         
-        for (int i = 0; i < chunks.size(); i++) {
+        int startIndex = 0;
+        int chunkIndex = 0;
+        
+        while (startIndex < content.length()) {
+            int endIndex = Math.min(startIndex + maxChunkSize, content.length());
+            String chunkContent = content.substring(startIndex, endIndex);
+            
             DocumentChunk chunk = new DocumentChunk();
-            chunk.setContent(chunks.get(i));
-            chunk.setChunkIndex(i);
-            documentChunks.add(chunk);
+            chunk.setDocument(document);
+            chunk.setContent(chunkContent);
+            chunk.setChunkIndex(chunkIndex);
+            chunk.setLanguage("zh");
+            
+            // 添加元数据
+            DocumentChunkMetadata metadata = new DocumentChunkMetadata();
+            metadata.setKey("position");
+            metadata.setValue(String.valueOf(startIndex));
+            metadata.setType("integer");
+            metadata.setDescription("Chunk start position in original document");
+            
+            chunks.add(chunk);
+            
+            startIndex = endIndex - overlapSize;
+            chunkIndex++;
         }
         
-        return documentChunks;
+        return chunks;
     }
 } 

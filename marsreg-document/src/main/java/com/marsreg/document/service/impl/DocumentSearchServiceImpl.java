@@ -7,6 +7,7 @@ import com.marsreg.document.model.DocumentSearchRequest;
 import com.marsreg.document.model.DocumentSearchResponse;
 import com.marsreg.document.model.MarsregDocument;
 import com.marsreg.common.model.Document;
+import com.marsreg.common.dto.DocumentQueryDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -108,29 +109,26 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
 
     @Override
     public DocumentSearchResponse searchDocuments(DocumentSearchRequest request) {
-        com.marsreg.common.model.DocumentSearchRequest commonRequest = com.marsreg.common.model.DocumentSearchRequest.builder()
-            .query(request.getQuery())
-            .page(request.getPage())
-            .size(request.getSize())
-            .build();
+        DocumentQueryDTO queryDTO = new DocumentQueryDTO();
+        queryDTO.setKeyword(request.getQuery());
 
-        com.marsreg.common.model.DocumentSearchResponse commonResponse = documentSearchFacade.searchDocuments(commonRequest);
+        Page<Document> documentPage = documentSearchFacade.search(queryDTO, Pageable.ofSize(request.getSize()).withPage(request.getPage()));
 
-        List<MarsregDocument> marsregDocuments = commonResponse.getDocuments().stream()
+        List<MarsregDocument> marsregDocuments = documentPage.getContent().stream()
             .map(this::toMarsregDocument)
             .collect(Collectors.toList());
 
         return new DocumentSearchResponse()
             .setDocuments(marsregDocuments)
-            .setTotal(commonResponse.getTotal())
-            .setPage(commonResponse.getPage())
-            .setSize(commonResponse.getSize());
+            .setTotal(documentPage.getTotalElements())
+            .setPage(request.getPage())
+            .setSize(request.getSize());
     }
 
     private MarsregDocument toMarsregDocument(Document document) {
         MarsregDocument marsregDocument = new MarsregDocument();
-        marsregDocument.setId(document.getId());
-        marsregDocument.setTitle(document.getTitle());
+        marsregDocument.setId(document.getId() != null ? document.getId().toString() : null);
+        marsregDocument.setTitle(document.getName());
         marsregDocument.setContent(document.getContent());
         marsregDocument.setType(document.getType());
         marsregDocument.setStatus(document.getStatus());

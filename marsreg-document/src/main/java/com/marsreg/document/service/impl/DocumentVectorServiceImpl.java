@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,8 @@ public class DocumentVectorServiceImpl implements DocumentVectorService {
     private final VectorStorageService vectorStorageService;
     private final DocumentChunkRepository documentChunkRepository;
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+    private final RedisTemplate<String, String> redisTemplate;
+    private static final String VECTOR_KEY_PREFIX = "doc:vector:";
 
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
@@ -190,11 +193,76 @@ public class DocumentVectorServiceImpl implements DocumentVectorService {
         }
     }
 
+    @Override
+    public List<Float> getVector(Long documentId) {
+        try {
+            String key = VECTOR_KEY_PREFIX + documentId;
+            String vectorStr = redisTemplate.opsForValue().get(key);
+            if (vectorStr == null) {
+                return null;
+            }
+            return parseVector(vectorStr);
+        } catch (Exception e) {
+            log.error("Error getting document vector: {}", documentId, e);
+            throw new RuntimeException("Failed to get document vector", e);
+        }
+    }
+
+    @Override
+    public void deleteVector(Long documentId) {
+        try {
+            String key = VECTOR_KEY_PREFIX + documentId;
+            redisTemplate.delete(key);
+            log.info("Document vector deleted successfully: {}", documentId);
+        } catch (Exception e) {
+            log.error("Error deleting document vector: {}", documentId, e);
+            throw new RuntimeException("Failed to delete document vector", e);
+        }
+    }
+
+    @Override
+    public List<Long> searchSimilarDocuments(Long documentId, int topK) {
+        try {
+            List<Float> queryVector = getVector(documentId);
+            if (queryVector == null) {
+                return new ArrayList<>();
+            }
+            
+            // 这里应该调用向量搜索服务，这里用随机结果模拟
+            List<Long> similarDocs = new ArrayList<>();
+            for (int i = 0; i < topK; i++) {
+                similarDocs.add(documentId + i + 1);
+            }
+            return similarDocs;
+        } catch (Exception e) {
+            log.error("Error searching similar documents: {}", documentId, e);
+            throw new RuntimeException("Failed to search similar documents", e);
+        }
+    }
+
     private String generateVectorId(Long documentId, Long chunkId) {
         return documentId + "_" + chunkId;
     }
 
     private Long extractChunkId(String vectorId) {
         return Long.parseLong(vectorId.split("_")[1]);
+    }
+
+    private List<Float> generateRandomVector(int dimension) {
+        List<Float> vector = new ArrayList<>();
+        for (int i = 0; i < dimension; i++) {
+            vector.add((float) Math.random());
+        }
+        return vector;
+    }
+
+    private List<Float> parseVector(String vectorStr) {
+        // 移除首尾的方括号，并按逗号分割
+        String[] values = vectorStr.substring(1, vectorStr.length() - 1).split(",");
+        List<Float> vector = new ArrayList<>();
+        for (String value : values) {
+            vector.add(Float.parseFloat(value.trim()));
+        }
+        return vector;
     }
 } 

@@ -29,9 +29,9 @@ public class DocumentIndexSyncServiceImpl implements DocumentIndexSyncService {
         try {
             DocumentIndex index = toDocumentIndex(document);
             documentIndexRepository.save(index);
-            log.info("文档已成功索引: {}", document.getId());
+            log.info("文档已成功索引: {}", document.getId().toString());
         } catch (Exception e) {
-            log.error("索引文档失败: " + document.getId(), e);
+            log.error("索引文档失败: " + document.getId().toString(), e);
             throw new RuntimeException("索引文档失败", e);
         }
     }
@@ -42,9 +42,9 @@ public class DocumentIndexSyncServiceImpl implements DocumentIndexSyncService {
         try {
             DocumentIndex index = toDocumentIndex(document);
             documentIndexRepository.save(index);
-            log.info("文档已成功更新: {}", document.getId());
+            log.info("文档已成功更新: {}", document.getId().toString());
         } catch (Exception e) {
-            log.error("更新文档索引失败: " + document.getId(), e);
+            log.error("更新文档索引失败: " + document.getId().toString(), e);
             throw new RuntimeException("更新文档索引失败", e);
         }
     }
@@ -80,8 +80,8 @@ public class DocumentIndexSyncServiceImpl implements DocumentIndexSyncService {
 
     private DocumentIndex toDocumentIndex(Document document) {
         return DocumentIndex.builder()
-                .documentId(document.getId())
-                .title(document.getTitle())
+                .documentId(document.getId().toString())
+                .title(document.getName())
                 .content(document.getContent())
                 .documentType(document.getType())
                 .status(document.getStatus())

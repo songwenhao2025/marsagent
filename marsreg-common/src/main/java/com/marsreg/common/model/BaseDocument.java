@@ -1,25 +1,20 @@
 package com.marsreg.common.model;
 
+import com.marsreg.common.enums.DocumentStatus;
 import lombok.Data;
-import lombok.Builder;
 import java.time.LocalDateTime;
 import java.util.Map;
 
 @Data
-@Builder
-public class Document {
+public abstract class BaseDocument {
     private Long id;
-    private String name;
-    private String contentType;
-    private String status;
-    private String description;
-    private String tags;
-    private String customMetadata;
-    private Long size;
-    private String url;
+    private String title;
     private String content;
     private String type;
+    private DocumentStatus status;
+    private String contentType;
     private String originalName;
+    private Long size;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private String createBy;

@@ -9,6 +9,16 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+  elasticsearch:
+    uris: http://localhost:9200
+    username: elastic
+    password: changeme
+    ssl:
+      verification-mode: none
+    connection-timeout: 1s
+    socket-timeout: 30s
+    max-conn-total: 100
+    max-conn-per-route: 10
 
 vector:
   storage:

@@ -23,7 +23,7 @@ public interface DocumentProcessService {
      * @param document 文档对象
      * @return 处理后的文本内容
      */
-    String processDocument(DocumentEntity document);
+    DocumentEntity processDocument(DocumentEntity document);
 
     /**
      * 提取文档文本

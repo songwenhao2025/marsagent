@@ -78,11 +78,6 @@
             <artifactId>marsreg-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- <dependency>
-            <groupId>com.marsreg</groupId>
-            <artifactId>marsreg-document</artifactId>
-            <version>${project.version}</version>
-        </dependency> -->
 
         <!-- 工具类 -->
         <dependency>

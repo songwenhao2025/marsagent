@@ -6,15 +6,25 @@ import com.google.common.cache.LoadingCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import lombok.Data;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Data
 @Configuration
-@RequiredArgsConstructor
+@ConfigurationProperties(prefix = "document.rate-limit")
 public class RateLimitConfig {
+    private RateLimitProperties upload;
+    private RateLimitProperties download;
+    private RateLimitProperties defaultConfig;
 
-    private final RateLimitProperties rateLimitProperties;
+    @Data
+    public static class RateLimitProperties {
+        private int limit = 100;
+        private int timeWindow = 60;
+    }
 
     @Bean
     public LoadingCache<String, TokenBucket> tokenBuckets() {
@@ -23,19 +33,19 @@ public class RateLimitConfig {
             .build(new CacheLoader<String, TokenBucket>() {
                 @Override
                 public TokenBucket load(String key) {
-                    RateLimitProperties.RateLimitConfig config = getConfigForKey(key);
+                    RateLimitProperties config = getConfigForKey(key);
                     return new TokenBucket(config.getLimit(), config.getTimeWindow());
                 }
             });
     }
 
-    private RateLimitProperties.RateLimitConfig getConfigForKey(String key) {
+    private RateLimitProperties getConfigForKey(String key) {
         if (key.startsWith("upload:")) {
-            return rateLimitProperties.getUpload();
+            return upload;
         } else if (key.startsWith("download:")) {
-            return rateLimitProperties.getDownload();
+            return download;
         }
-        return rateLimitProperties.getDefaultConfig();
+        return defaultConfig;
     }
 
     public static class TokenBucket {
