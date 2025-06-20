@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @EnableCaching
-public class SearchCacheConfig {
+public class DocumentSearchCacheConfig {
     // 缓存名称常量
     public static final String SEARCH_RESULT_CACHE = "search_result_cache";
     public static final String SEARCH_SUGGESTION_CACHE = "search_suggestion_cache";

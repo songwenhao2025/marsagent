@@ -57,7 +57,7 @@ public class Document {
     @Column(length = 255)
     private String name;
 
-    @Column(length = 255)
+    @Column(name = "content_type", length = 255)
     private String contentType;
 
     private Long size;

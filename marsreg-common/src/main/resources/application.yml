@@ -64,9 +64,9 @@ springdoc:
   packages-to-scan: com.marsreg
   paths-to-match: /api/**
 
-jwt:
-  secret: your-secret-key-here-must-be-at-least-32-characters-long
-  expiration: 86400000 # 24 hours in milliseconds
+# jwt:
+#   secret: your-secret-key-here-must-be-at-least-32-characters-long
+#   expiration: 86400000 # 24 hours in milliseconds
 
 logging:
   level:

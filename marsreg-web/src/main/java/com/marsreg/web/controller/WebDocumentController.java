@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/documents")
-public class DocumentController {
+public class WebDocumentController {
 
     @Autowired
     private DocumentService documentService;

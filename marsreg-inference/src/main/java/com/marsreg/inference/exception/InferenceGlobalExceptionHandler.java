@@ -1,4 +1,4 @@
-package com.marsreg.search.exception;
+package com.marsreg.inference.exception;
 
 import lombok.Data;
 import org.springframework.http.HttpStatus;
@@ -9,8 +9,8 @@ import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
 
-@RestControllerAdvice
-public class GlobalExceptionHandler {
+@RestControllerAdvice("com.marsreg.inference")
+public class InferenceGlobalExceptionHandler {
 
     @Data
     public static class ErrorResponse {
@@ -27,8 +27,8 @@ public class GlobalExceptionHandler {
         }
     }
 
-    @ExceptionHandler(SearchException.class)
-    public ResponseEntity<ErrorResponse> handleSearchException(SearchException ex, WebRequest request) {
+    @ExceptionHandler(InferenceException.class)
+    public ResponseEntity<ErrorResponse> handleInferenceException(InferenceException ex, WebRequest request) {
         ErrorResponse errorResponse = new ErrorResponse(
             ex.getErrorCode(),
             ex.getErrorMessage(),
@@ -40,8 +40,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
         ErrorResponse errorResponse = new ErrorResponse(
-            "INTERNAL_ERROR",
-            "服务器内部错误",
+            String.valueOf(ErrorCode.INTERNAL_ERROR.getCode()),
+            ErrorCode.INTERNAL_ERROR.getMessage(),
             request.getDescription(false)
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);

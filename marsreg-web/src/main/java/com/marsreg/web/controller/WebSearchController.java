@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/search")
-public class SearchController {
+public class WebSearchController {
 
     @Autowired
     private DocumentSearchFacade documentSearchFacade;

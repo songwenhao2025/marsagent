@@ -19,7 +19,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class RateLimitAspect {
+public class DocumentRateLimitAspect {
 
     private final LoadingCache<String, TokenBucket> tokenBuckets;
 

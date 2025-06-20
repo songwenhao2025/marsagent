@@ -13,10 +13,8 @@ import org.elasticsearch.client.RestClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 
 @Configuration
-@EnableElasticsearchRepositories(basePackages = "com.marsreg.search.repository")
 public class SearchConfig {
 
     @Value("${elasticsearch.host}")
@@ -32,7 +30,7 @@ public class SearchConfig {
     private String password;
 
     @Bean
-    public ElasticsearchClient elasticsearchClient() {
+    public ElasticsearchClient searchElasticsearchClient() {
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY,
             new UsernamePasswordCredentials(username, password));

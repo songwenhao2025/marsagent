@@ -10,7 +10,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableCaching
-public class CacheConfig {
+public class SearchCacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
